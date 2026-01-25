@@ -1,12 +1,15 @@
 {
   "workspace": "${HOME}/clawd",
-  "skills_dir": "${HOME}/.clawdbot/skills",
   "backup_dir": "${HOME}/.clawdbot/backups",
   "auto_update": false,
   "backup_before_update": true,
   "backup_count": 5,
   "update_interval_hours": 24,
   "excluded_skills": [],
+  "skills_dirs": [
+    {"path": "~/.clawdbot/skills", "label": "prod", "backup": true, "update": true},
+    {"path": "~/clawd/skills", "label": "dev", "backup": true, "update": false}
+  ],
   "remote_storage": {
     "enabled": false,
     "rclone_remote": "my-remote:",

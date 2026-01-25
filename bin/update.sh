@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Clawdbot Update Plus - Backup, Update, Restore
 # Author: hopyky
-# Version: 1.4.0
+# Version: 1.5.0
 # License: MIT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -62,6 +62,7 @@ load_config() {
   # Default values FIRST
   WORKSPACE="${WORKSPACE:-$WORKSPACE_DEFAULT}"
   SKILLS_DIR="${HOME}/.clawdbot/skills"
+  SKILLS_DIRS_JSON=""
   BACKUP_DIR="${BACKUP_DIR:-$BACKUP_DIR_DEFAULT}"
   AUTO_UPDATE="false"
   BACKUP_BEFORE_UPDATE="true"
@@ -80,7 +81,6 @@ load_config() {
   # Then try to load from JSON config
   if [[ -f "$CONFIG_FILE" ]]; then
     WORKSPACE=$(jq -r '.workspace // "'"$WORKSPACE_DEFAULT"'"' "$CONFIG_FILE")
-    SKILLS_DIR=$(jq -r '.skills_dir // "'"${HOME}/.clawdbot/skills"'"' "$CONFIG_FILE")
     BACKUP_DIR=$(jq -r '.backup_dir // "'"$BACKUP_DIR_DEFAULT"'"' "$CONFIG_FILE")
     AUTO_UPDATE=$(jq -r '.auto_update // "false"' "$CONFIG_FILE")
     BACKUP_BEFORE_UPDATE=$(jq -r '.backup_before_update // "true"' "$CONFIG_FILE")
@@ -95,6 +95,20 @@ load_config() {
     NOTIFY_TARGET=$(jq -r '.notifications.target // ""' "$CONFIG_FILE")
     NOTIFY_ON_SUCCESS=$(jq -r '.notifications.on_success // "true"' "$CONFIG_FILE")
     NOTIFY_ON_ERROR=$(jq -r '.notifications.on_error // "true"' "$CONFIG_FILE")
+
+    # Check for new skills_dirs format (array) or legacy skills_dir (string)
+    if jq -e '.skills_dirs' "$CONFIG_FILE" >/dev/null 2>&1; then
+      # New format: skills_dirs array
+      SKILLS_DIRS_JSON=$(jq -c '.skills_dirs' "$CONFIG_FILE")
+    else
+      # Legacy format: single skills_dir
+      SKILLS_DIR=$(jq -r '.skills_dir // "'"${HOME}/.clawdbot/skills"'"' "$CONFIG_FILE")
+      # Convert to new format internally
+      SKILLS_DIRS_JSON=$(jq -n --arg path "$SKILLS_DIR" '[{path: $path, label: "default", backup: true, update: true}]')
+    fi
+  else
+    # No config file, use defaults
+    SKILLS_DIRS_JSON=$(jq -n --arg path "$SKILLS_DIR" '[{path: $path, label: "default", backup: true, update: true}]')
   fi
 
   # Ensure directories exist
@@ -216,27 +230,77 @@ check_disk_space() {
 
 # Create timestamped backup
 create_backup() {
+  local backup_name="clawdbot-update-$(date +%Y-%m-%d-%H:%M:%S).tar.gz"
+  local backup_path="${BACKUP_DIR}/${backup_name}"
+  local tmp_backup_dir=$(mktemp -d)
+  local dirs_backed_up=0
+
   if [[ "$DRY_RUN" == true ]]; then
-    local backup_name="clawdbot-update-$(date +%Y-%m-%d-%H:%M:%S).tar.gz"
     if [[ "$ENCRYPTION_ENABLED" == "true" ]]; then
       backup_name+=".gpg"
     fi
     log_dry_run "Would create backup: ${BACKUP_DIR}/${backup_name}"
+    # Show which dirs would be backed up
+    echo "$SKILLS_DIRS_JSON" | jq -r '.[] | select(.backup == true) | "  → \(.label): \(.path)"' | while read -r line; do
+      log_dry_run "$line"
+    done
     REPORT_JSON=$(echo "$REPORT_JSON" | jq '.backup = {status: "skipped", filename: $filename}' --arg filename "$backup_name")
     echo "$backup_name"
     return 0
   fi
 
-  local backup_name="clawdbot-update-$(date +%Y-%m-%d-%H:%M:%S).tar.gz"
-  local backup_path="${BACKUP_DIR}/${backup_name}"
-
   log_info "Creating backup archive..."
-  
-  tar -czf "$backup_path" \
-    -C "${SKILLS_DIR}" \
-    --exclude='.venv' --exclude='node_modules' --exclude='*.pyc' --exclude='__pycache__' \
-    . 2>/dev/null || { REPORT_JSON=$(echo "$REPORT_JSON" | jq '.backup = {status: "failed", error: "tar creation failed"}'); return 1; }
-  tar -rf "$backup_path" -C "${HOME}/.clawdbot" clawdbot.json 2>/dev/null || true
+
+  # Iterate over skills_dirs with backup=true
+  while IFS= read -r dir_config; do
+    local dir_path=$(echo "$dir_config" | jq -r '.path' | sed "s|\${HOME}|$HOME|g" | sed "s|~|$HOME|g")
+    local dir_label=$(echo "$dir_config" | jq -r '.label')
+    local dir_backup=$(echo "$dir_config" | jq -r '.backup')
+
+    if [[ "$dir_backup" != "true" ]]; then
+      continue
+    fi
+
+    if [[ ! -d "$dir_path" ]]; then
+      log_warning "Skills directory not found: $dir_path ($dir_label), skipping"
+      continue
+    fi
+
+    log_info "Backing up $dir_label: $dir_path"
+
+    # Create subdirectory in temp for this label
+    mkdir -p "$tmp_backup_dir/$dir_label"
+
+    # Copy skills to temp dir (excluding unwanted files)
+    rsync -a --exclude='.venv' --exclude='node_modules' --exclude='*.pyc' --exclude='__pycache__' \
+      "$dir_path/" "$tmp_backup_dir/$dir_label/" 2>/dev/null || {
+        log_warning "Failed to backup $dir_label, continuing..."
+        continue
+      }
+
+    dirs_backed_up=$((dirs_backed_up + 1))
+  done < <(echo "$SKILLS_DIRS_JSON" | jq -c '.[]')
+
+  if [[ $dirs_backed_up -eq 0 ]]; then
+    log_error "No directories were backed up"
+    rm -rf "$tmp_backup_dir"
+    REPORT_JSON=$(echo "$REPORT_JSON" | jq '.backup = {status: "failed", error: "no directories backed up"}')
+    return 1
+  fi
+
+  # Add clawdbot config
+  cp "${HOME}/.clawdbot/clawdbot.json" "$tmp_backup_dir/" 2>/dev/null || true
+
+  # Create tar archive
+  tar -czf "$backup_path" -C "$tmp_backup_dir" . 2>/dev/null || {
+    log_error "Failed to create backup archive"
+    rm -rf "$tmp_backup_dir"
+    REPORT_JSON=$(echo "$REPORT_JSON" | jq '.backup = {status: "failed", error: "tar creation failed"}')
+    return 1
+  }
+
+  # Cleanup temp dir
+  rm -rf "$tmp_backup_dir"
 
   if [[ "$ENCRYPTION_ENABLED" == "true" ]]; then
     if ! command -v gpg &>/dev/null; then
@@ -398,57 +462,67 @@ update_skills() {
   update_git_skills
 }
 
-# Fallback: Update skills via git pull (legacy method)
+# Update skills via git pull
 update_git_skills() {
-  local skills_dir="${SKILLS_DIR:-${HOME}/.clawdbot/skills}"
-  
-  log_info "Checking Git-based skills in: $skills_dir"
+  # Iterate over skills_dirs with update=true
+  while IFS= read -r dir_config; do
+    local dir_path=$(echo "$dir_config" | jq -r '.path' | sed "s|\${HOME}|$HOME|g" | sed "s|~|$HOME|g")
+    local dir_label=$(echo "$dir_config" | jq -r '.label')
+    local dir_update=$(echo "$dir_config" | jq -r '.update')
 
-  if [[ ! -d "$skills_dir" ]]; then
-    log_error "Skills directory not found: $skills_dir"
-    return 1
-  fi
+    if [[ "$dir_update" != "true" ]]; then
+      log_info "Skipping $dir_label (update disabled)"
+      continue
+    fi
 
-  for skill_dir in "$skills_dir"/*/; do
-    if [[ -d "$skill_dir/.git" ]]; then
-      local skill_name
-      skill_name=$(basename "$skill_dir")
+    if [[ ! -d "$dir_path" ]]; then
+      log_warning "Skills directory not found: $dir_path ($dir_label), skipping"
+      continue
+    fi
 
-      cd "$skill_dir"
+    log_info "Checking Git-based skills in: $dir_path ($dir_label)"
 
-      if is_excluded "$skill_name"; then
-        log_info "Skipping excluded skill: $skill_name"
-        REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_updated += [{name: $name, status: "skipped"}]' --arg name "$skill_name")
-        continue
-      fi
+    for skill_dir in "$dir_path"/*/; do
+      if [[ -d "$skill_dir/.git" ]]; then
+        local skill_name
+        skill_name=$(basename "$skill_dir")
 
-      if [[ -n "$(git status --porcelain)" ]]; then
-        log_warning "$skill_name has local changes, skipping."
-        REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_failed += [{name: $name, status: "failed", error: "local changes detected"}]' --arg name "$skill_name")
-        continue
-      fi
+        cd "$skill_dir"
 
-      log_info "Updating: $skill_name"
-      local current_commit
-      current_commit=$(git rev-parse --short HEAD)
+        if is_excluded "$skill_name"; then
+          log_info "Skipping excluded skill: $skill_name"
+          REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_updated += [{name: $name, status: "skipped", source: $source}]' --arg name "$skill_name" --arg source "$dir_label")
+          continue
+        fi
 
-      if ! git pull --quiet; then
-        log_error "$skill_name update failed. Rolling back..."
-        git reset --hard --quiet "$current_commit"
-        REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_failed += [{name: $name, status: "failed", error: "pull failed, rolled back"}]' --arg name "$skill_name")
-      else
-        local new_commit
-        new_commit=$(git rev-parse --short HEAD)
-        if [[ "$current_commit" != "$new_commit" ]]; then
-          log_success "$skill_name updated ($current_commit → $new_commit)"
-          REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_updated += [{name: $name, status: "updated", from_commit: $from, to_commit: $to}]' --arg name "$skill_name" --arg from "$current_commit" --arg to "$new_commit")
+        if [[ -n "$(git status --porcelain)" ]]; then
+          log_warning "$skill_name has local changes, skipping."
+          REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_failed += [{name: $name, status: "failed", error: "local changes detected", source: $source}]' --arg name "$skill_name" --arg source "$dir_label")
+          continue
+        fi
+
+        log_info "Updating: $skill_name ($dir_label)"
+        local current_commit
+        current_commit=$(git rev-parse --short HEAD)
+
+        if ! git pull --quiet; then
+          log_error "$skill_name update failed. Rolling back..."
+          git reset --hard --quiet "$current_commit"
+          REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_failed += [{name: $name, status: "failed", error: "pull failed, rolled back", source: $source}]' --arg name "$skill_name" --arg source "$dir_label")
         else
-          log_info "$skill_name already up to date"
-          REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_updated += [{name: $name, status: "no_change"}]' --arg name "$skill_name")
+          local new_commit
+          new_commit=$(git rev-parse --short HEAD)
+          if [[ "$current_commit" != "$new_commit" ]]; then
+            log_success "$skill_name updated ($current_commit → $new_commit)"
+            REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_updated += [{name: $name, status: "updated", from_commit: $from, to_commit: $to, source: $source}]' --arg name "$skill_name" --arg from "$current_commit" --arg to "$new_commit" --arg source "$dir_label")
+          else
+            log_info "$skill_name already up to date"
+            REPORT_JSON=$(echo "$REPORT_JSON" | jq '.skills_updated += [{name: $name, status: "no_change", source: $source}]' --arg name "$skill_name" --arg source "$dir_label")
+          fi
         fi
       fi
-    fi
-  done
+    done
+  done < <(echo "$SKILLS_DIRS_JSON" | jq -c '.[]')
 }
 
 # Restore from backup
@@ -611,7 +685,7 @@ send_notification() {
 # Show help
 show_help() {
   cat <<'EOF'
-Clawdbot Update Plus v1.4.0
+Clawdbot Update Plus v1.5.0
 Backup, update, and restore Clawdbot and all installed skills.
 
 USAGE
@@ -635,6 +709,16 @@ OPTIONS
   --notify                Force send notification (overrides config)
   --json-report           Generate JSON report of the update
   --show-diffs            Show file changes for each updated skill
+
+MULTI-DIRECTORY SUPPORT
+  Configure multiple skills directories with separate backup/update settings:
+    "skills_dirs": [
+      {"path": "~/.clawdbot/skills", "label": "prod", "backup": true, "update": true},
+      {"path": "~/clawd/skills", "label": "dev", "backup": true, "update": false}
+    ]
+
+  - backup: Include this directory in backups
+  - update: Run git pull on skills in this directory
 
 NOTIFICATIONS
   Configure in ~/.clawdbot/clawdbot-update.json:

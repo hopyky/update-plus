@@ -1,8 +1,8 @@
 ---
 name: clawdbot-update-plus
 description: Backup, update, and restore Clawdbot and all installed skills with auto-rollback and cloud sync
-version: 1.4.0
-metadata: {"clawdbot":{"emoji":"🔄","requires":{"bins":["git","jq"],"commands":["clawdbot"]}}}
+version: 1.5.0
+metadata: {"clawdbot":{"emoji":"🔄","requires":{"bins":["git","jq","rsync"],"commands":["clawdbot"]}}}
 ---
 
 # 🔄 Clawdbot Update Plus
@@ -41,6 +41,7 @@ clawdbot update-plus restore clawdbot-update-2026-01-25-12:00:00.tar.gz
 | **JSON Reports** | Generate detailed update reports for automation |
 | **Dry Run Mode** | Preview changes without modifying anything |
 | **Notifications** | Get notified on success/error via WhatsApp, Telegram, or Discord |
+| **Multi-Directory** | Separate prod/dev directories with independent backup/update settings |
 
 ## Installation
 
@@ -106,6 +107,39 @@ Create `~/.clawdbot/clawdbot-update.json`:
 | `backup_before_update` | `true` | Create backup before each update |
 | `backup_count` | `5` | Number of backups to retain (local + remote) |
 | `excluded_skills` | `[]` | Skills to skip during updates |
+
+## Multi-Directory Support
+
+Manage multiple skills directories with separate backup and update settings. Perfect for separating production and development environments.
+
+### Configuration
+
+```json
+{
+  "skills_dirs": [
+    {"path": "~/.clawdbot/skills", "label": "prod", "backup": true, "update": true},
+    {"path": "~/clawd/skills", "label": "dev", "backup": true, "update": false}
+  ]
+}
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `path` | Directory path (supports `~` and `${HOME}`) |
+| `label` | Name shown in logs and backups |
+| `backup` | Include in backups (`true`/`false`) |
+| `update` | Run `git pull` on skills (`true`/`false`) |
+
+### Use Cases
+
+| Scenario | Backup | Update |
+|----------|--------|--------|
+| **Production** (ClawdHub installs) | ✅ | ✅ Auto-update |
+| **Development** (your code) | ✅ | ❌ Manual only |
+
+> **Note:** If `skills_dirs` is not set, the legacy `skills_dir` option is used with backup and update enabled.
 
 ## Commands
 
@@ -475,6 +509,12 @@ rclone lsd your-remote:
 ```
 
 ## Changelog
+
+### v1.5.0
+- Added multi-directory support (`skills_dirs` config)
+- Separate backup/update settings per directory
+- Perfect for prod/dev separation
+- Backups now organized by label (prod/, dev/)
 
 ### v1.4.0
 - Added notifications via Clawdbot messaging (WhatsApp, Telegram, Discord)
