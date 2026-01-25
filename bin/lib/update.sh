@@ -1,6 +1,34 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Update functions
-# Version: 2.0.0
+# Version: 2.1.0
+
+# Global tracking
+CLAWDBOT_UPDATED=false
+SKILLS_UPDATED=0
+
+# Detect package manager used to install clawdbot
+detect_package_manager() {
+  # Check if clawdbot is in a pnpm global path
+  local clawdbot_path=$(which clawdbot 2>/dev/null)
+
+  if [[ "$clawdbot_path" == *"pnpm"* ]]; then
+    echo "pnpm"
+  elif [[ "$clawdbot_path" == *"yarn"* ]]; then
+    echo "yarn"
+  elif [[ "$clawdbot_path" == *"bun"* ]]; then
+    echo "bun"
+  elif command_exists pnpm && pnpm list -g clawdbot 2>/dev/null | grep -q clawdbot; then
+    echo "pnpm"
+  elif command_exists yarn && yarn global list 2>/dev/null | grep -q clawdbot; then
+    echo "yarn"
+  elif command_exists bun && bun pm ls -g 2>/dev/null | grep -q clawdbot; then
+    echo "bun"
+  elif command_exists npm; then
+    echo "npm"
+  else
+    echo "unknown"
+  fi
+}
 
 # Update Clawdbot binary
 update_clawdbot() {
@@ -17,23 +45,63 @@ update_clawdbot() {
   fi
 
   local current_version
-  current_version=$(clawdbot --version 2>&1 | head -1 || echo "unknown")
+  current_version=$(clawdbot --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?' | head -1 || echo "unknown")
   log_info "Current version: $current_version"
   log_to_file "Clawdbot current version: $current_version"
 
-  # Run clawdbot update
-  if ! clawdbot update 2>/dev/null; then
+  # Detect package manager
+  local pkg_manager=$(detect_package_manager)
+  log_info "Package manager: $pkg_manager"
+
+  # Run appropriate update command
+  local update_success=false
+  case "$pkg_manager" in
+    pnpm)
+      log_info "Running: pnpm add -g clawdbot@latest"
+      if pnpm add -g clawdbot@latest 2>&1; then
+        update_success=true
+      fi
+      ;;
+    npm)
+      log_info "Running: npm install -g clawdbot@latest"
+      if npm install -g clawdbot@latest 2>&1; then
+        update_success=true
+      fi
+      ;;
+    yarn)
+      log_info "Running: yarn global add clawdbot@latest"
+      if yarn global add clawdbot@latest 2>&1; then
+        update_success=true
+      fi
+      ;;
+    bun)
+      log_info "Running: bun add -g clawdbot@latest"
+      if bun add -g clawdbot@latest 2>&1; then
+        update_success=true
+      fi
+      ;;
+    *)
+      log_warning "Unknown package manager, trying clawdbot update..."
+      if clawdbot update 2>&1; then
+        update_success=true
+      fi
+      ;;
+  esac
+
+  if [[ "$update_success" != true ]]; then
     log_error "Clawdbot update failed"
     log_to_file "ERROR: Clawdbot update failed"
     return 1
   fi
 
+  # Check new version
   local new_version
-  new_version=$(clawdbot --version 2>&1 | head -1 || echo "unknown")
+  new_version=$(clawdbot --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?' | head -1 || echo "unknown")
 
   if [[ "$current_version" != "$new_version" ]]; then
     log_success "Clawdbot updated: $current_version → $new_version"
     log_to_file "Clawdbot updated: $current_version -> $new_version"
+    CLAWDBOT_UPDATED=true
   else
     log_info "Clawdbot is already up to date ($current_version)"
   fi
@@ -136,6 +204,7 @@ update_single_skill() {
   if [[ "$current_commit" != "$new_commit" ]]; then
     log_success "$skill_name updated ($current_commit → $new_commit)"
     log_to_file "Updated $skill_name: $current_commit -> $new_commit"
+    SKILLS_UPDATED=$((SKILLS_UPDATED + 1))
   else
     log_info "$skill_name already up to date"
   fi

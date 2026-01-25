@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Cron management functions
-# Version: 2.0.0
+# Version: 2.1.0
 
 # Install cron job for automatic updates
 install_cron() {

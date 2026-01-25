@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Configuration management
-# Version: 2.0.0
+# Version: 2.1.0
 
 # Default paths
 WORKSPACE_DEFAULT="${HOME}/clawd"

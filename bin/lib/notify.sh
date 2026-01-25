@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Notification functions
-# Version: 2.0.0
+# Version: 2.1.0
 
 # Detect channel from target format
 detect_channel() {
@@ -19,7 +19,7 @@ detect_channel() {
 
 # Send notification via Clawdbot messaging
 send_notification() {
-  local status="$1"  # "success" or "error"
+  local status="$1"  # "success", "info", or "error"
   local details="${2:-}"
 
   # Check if notifications are enabled
@@ -28,7 +28,7 @@ send_notification() {
   fi
 
   # Check notification type preference
-  if [[ "$status" == "success" ]] && [[ "$NOTIFY_ON_SUCCESS" != "true" ]]; then
+  if [[ "$status" == "success" || "$status" == "info" ]] && [[ "$NOTIFY_ON_SUCCESS" != "true" ]]; then
     return 0
   fi
   if [[ "$status" == "error" ]] && [[ "$NOTIFY_ON_ERROR" != "true" ]]; then
@@ -61,7 +61,10 @@ send_notification() {
   local message=""
   if [[ "$status" == "success" ]]; then
     message="✅ *Clawdbot Update Complete*"
-    message+="\n\n📦 Backup and update completed successfully."
+    message+="\n\n📦 Updates applied successfully."
+  elif [[ "$status" == "info" ]]; then
+    message="ℹ️ *Clawdbot Update Check*"
+    message+="\n\n📋 Everything is already up to date."
   else
     message="❌ *Clawdbot Update Failed*"
     message+="\n\n⚠️ An error occurred during the update."

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clawdbot Update Plus v2.0.4
+# Clawdbot Update Plus v2.1.0
 # Full backup, update, and restore for Clawdbot
 # Author: hopyky
 # License: MIT
@@ -33,13 +33,13 @@ NO_BACKUP_CLI=false
 
 # Show version
 show_version() {
-  echo "Clawdbot Update Plus v2.0.4"
+  echo "Clawdbot Update Plus v2.1.0"
 }
 
 # Show help
 show_help() {
   cat <<'EOF'
-Clawdbot Update Plus v2.0.4
+Clawdbot Update Plus v2.1.0
 Full backup, update, and restore for Clawdbot.
 
 USAGE
@@ -249,6 +249,26 @@ cmd_update() {
   # Update skills
   update_skills
 
+  # Build summary
+  local summary=""
+  if [[ "$CLAWDBOT_UPDATED" == true ]]; then
+    summary+="Clawdbot: updated\n"
+  else
+    summary+="Clawdbot: no update\n"
+  fi
+
+  if [[ "$SKILLS_UPDATED" -gt 0 ]]; then
+    summary+="Skills: $SKILLS_UPDATED updated\n"
+  else
+    summary+="Skills: no update\n"
+  fi
+
+  if [[ -n "$backup_name" ]]; then
+    summary+="Backup: $backup_name"
+  else
+    summary+="Backup: none"
+  fi
+
   # Success
   echo ""
   log_success "Update completed!"
@@ -258,8 +278,13 @@ cmd_update() {
     log_info "Backup: $backup_name"
   fi
 
-  # Send notification
-  send_notification "success" "Backup: ${backup_name:-none}"
+  # Send notification with details
+  if [[ "$CLAWDBOT_UPDATED" == true ]] || [[ "$SKILLS_UPDATED" -gt 0 ]]; then
+    send_notification "success" "$summary"
+  else
+    # Nothing was updated - still notify but with different message
+    send_notification "info" "$summary"
+  fi
 
   # Clean logs
   clean_logs

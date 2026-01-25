@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Utility functions
-# Version: 2.0.0
+# Version: 2.1.0
 
 # Colors for output
 RED='\033[0;31m'
