@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clawdbot Update Plus v2.0.3
+# Clawdbot Update Plus v2.0.4
 # Full backup, update, and restore for Clawdbot
 # Author: hopyky
 # License: MIT
@@ -33,17 +33,17 @@ NO_BACKUP_CLI=false
 
 # Show version
 show_version() {
-  echo "Clawdbot Update Plus v2.0.3"
+  echo "Clawdbot Update Plus v2.0.4"
 }
 
 # Show help
 show_help() {
   cat <<'EOF'
-Clawdbot Update Plus v2.0.3
+Clawdbot Update Plus v2.0.4
 Full backup, update, and restore for Clawdbot.
 
 USAGE
-  clawdbot update-plus <command> [options]
+  clawdbot-update-plus <command> [options]
 
 COMMANDS
   backup                       Create a backup of configured paths
@@ -88,11 +88,11 @@ NOTIFICATIONS
     }
 
 EXAMPLES
-  clawdbot update-plus backup
-  clawdbot update-plus update --dry-run
-  clawdbot update-plus restore backup.tar.gz
-  clawdbot update-plus restore backup.tar.gz config
-  clawdbot update-plus check
+  clawdbot-update-plus backup
+  clawdbot-update-plus update --dry-run
+  clawdbot-update-plus restore backup.tar.gz
+  clawdbot-update-plus restore backup.tar.gz config
+  clawdbot-update-plus check
 
 For full documentation: https://github.com/hopyky/clawdbot-update-plus
 EOF

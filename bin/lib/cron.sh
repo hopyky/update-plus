@@ -37,7 +37,7 @@ install_cron() {
   log_success "Cron job installed!"
   echo ""
   log_info "To change schedule, edit with: crontab -e"
-  log_info "To remove, run: clawdbot update-plus uninstall-cron"
+  log_info "To remove, run: clawdbot-update-plus uninstall-cron"
 
   return 0
 }

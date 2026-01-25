@@ -231,7 +231,7 @@ check_updates() {
   echo ""
 
   if [[ $updates_available -eq 1 ]]; then
-    log_info "Run 'clawdbot update-plus update' to apply updates"
+    log_info "Run 'clawdbot-update-plus update' to apply updates"
   else
     log_success "Everything is up to date!"
   fi
