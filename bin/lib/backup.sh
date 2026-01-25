@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Backup functions
-# Version: 2.1.0
+# Version: 2.1.1
 
 # Create timestamped backup
 create_backup() {

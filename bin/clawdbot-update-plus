@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clawdbot Update Plus v2.1.0
+# Clawdbot Update Plus v2.1.1
 # Full backup, update, and restore for Clawdbot
 # Author: hopyky
 # License: MIT
@@ -33,13 +33,13 @@ NO_BACKUP_CLI=false
 
 # Show version
 show_version() {
-  echo "Clawdbot Update Plus v2.1.0"
+  echo "Clawdbot Update Plus v2.1.1"
 }
 
 # Show help
 show_help() {
   cat <<'EOF'
-Clawdbot Update Plus v2.1.0
+Clawdbot Update Plus v2.1.1
 Full backup, update, and restore for Clawdbot.
 
 USAGE

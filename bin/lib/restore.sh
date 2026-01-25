@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Restore functions
-# Version: 2.1.0
+# Version: 2.1.1
 
 # Restore from backup
 restore_backup() {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Notification functions
-# Version: 2.1.0
+# Version: 2.1.1
 
 # Detect channel from target format
 detect_channel() {

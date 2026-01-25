@@ -1,10 +1,65 @@
 #!/usr/bin/env bash
 # Clawdbot Update Plus - Update functions
-# Version: 2.1.0
+# Version: 2.1.1
 
 # Global tracking
 CLAWDBOT_UPDATED=false
 SKILLS_UPDATED=0
+
+# Fix pnpm launcher script bug (pnpm doesn't update the launcher after upgrade)
+fix_pnpm_launcher() {
+  local clawdbot_bin=$(which clawdbot 2>/dev/null)
+
+  if [[ -z "$clawdbot_bin" ]]; then
+    return 0
+  fi
+
+  # Check if clawdbot works
+  if clawdbot --version &>/dev/null; then
+    return 0  # Works fine, no fix needed
+  fi
+
+  log_warning "Detected pnpm launcher bug, fixing..."
+
+  # Find the pnpm global directory
+  local pnpm_global_dir=$(dirname "$clawdbot_bin")/global/5/.pnpm
+
+  if [[ ! -d "$pnpm_global_dir" ]]; then
+    log_warning "Could not find pnpm global directory"
+    return 1
+  fi
+
+  # Find the latest clawdbot version directory
+  local latest_clawdbot_dir=$(ls -d "$pnpm_global_dir"/clawdbot@* 2>/dev/null | sort -V | tail -1)
+
+  if [[ -z "$latest_clawdbot_dir" ]]; then
+    log_warning "Could not find clawdbot installation"
+    return 1
+  fi
+
+  local latest_clawdbot_name=$(basename "$latest_clawdbot_dir")
+
+  # Extract the old version from the launcher script
+  local old_version=$(grep -oE 'clawdbot@[^/]+' "$clawdbot_bin" | head -1)
+
+  if [[ -z "$old_version" ]] || [[ "$old_version" == "$latest_clawdbot_name" ]]; then
+    return 0  # Already correct or can't determine
+  fi
+
+  # Fix the launcher script
+  log_info "Updating launcher: $old_version → $latest_clawdbot_name"
+  sed -i '' "s|$old_version|$latest_clawdbot_name|g" "$clawdbot_bin" 2>/dev/null
+
+  # Verify fix worked
+  if clawdbot --version &>/dev/null; then
+    log_success "pnpm launcher fixed"
+    log_to_file "Fixed pnpm launcher: $old_version -> $latest_clawdbot_name"
+  else
+    log_warning "Could not fix pnpm launcher automatically"
+  fi
+
+  return 0
+}
 
 # Detect package manager used to install clawdbot
 detect_package_manager() {
@@ -92,6 +147,11 @@ update_clawdbot() {
     log_error "Clawdbot update failed"
     log_to_file "ERROR: Clawdbot update failed"
     return 1
+  fi
+
+  # Fix pnpm launcher script if needed (pnpm bug workaround)
+  if [[ "$pkg_manager" == "pnpm" ]]; then
+    fix_pnpm_launcher
   fi
 
   # Check new version
