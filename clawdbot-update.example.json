@@ -6,9 +6,13 @@
   "backup_count": 5,
   "update_interval_hours": 24,
   "excluded_skills": [],
+  "backup_paths": [
+    {"path": "~/.clawdbot", "label": "config", "exclude": ["backups", "logs", "media", "*.lock"]},
+    {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules", ".venv", "__pycache__"]}
+  ],
   "skills_dirs": [
-    {"path": "~/.clawdbot/skills", "label": "prod", "backup": true, "update": true},
-    {"path": "~/clawd/skills", "label": "dev", "backup": true, "update": false}
+    {"path": "~/.clawdbot/skills", "label": "prod", "update": true},
+    {"path": "~/clawd/skills", "label": "dev", "update": false}
   ],
   "remote_storage": {
     "enabled": false,

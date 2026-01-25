@@ -1,7 +1,7 @@
 ---
 name: clawdbot-update-plus
-description: Backup, update, and restore Clawdbot and all installed skills with auto-rollback and cloud sync
-version: 1.5.0
+description: Full backup, update, and restore for Clawdbot - config, workspace, and skills with auto-rollback
+version: 1.6.0
 metadata: {"clawdbot":{"emoji":"🔄","requires":{"bins":["git","jq","rsync"],"commands":["clawdbot"]}}}
 ---
 
@@ -41,7 +41,8 @@ clawdbot update-plus restore clawdbot-update-2026-01-25-12:00:00.tar.gz
 | **JSON Reports** | Generate detailed update reports for automation |
 | **Dry Run Mode** | Preview changes without modifying anything |
 | **Notifications** | Get notified on success/error via WhatsApp, Telegram, or Discord |
-| **Multi-Directory** | Separate prod/dev directories with independent backup/update settings |
+| **Full Backup** | Backup entire Clawdbot environment (config, workspace, skills) |
+| **Multi-Directory** | Separate prod/dev skills with independent update settings |
 
 ## Installation
 
@@ -108,38 +109,51 @@ Create `~/.clawdbot/clawdbot-update.json`:
 | `backup_count` | `5` | Number of backups to retain (local + remote) |
 | `excluded_skills` | `[]` | Skills to skip during updates |
 
-## Multi-Directory Support
+## Full Environment Backup
 
-Manage multiple skills directories with separate backup and update settings. Perfect for separating production and development environments.
+Backup your entire Clawdbot environment with `backup_paths`. Separate from skills update logic for clean architecture.
 
 ### Configuration
 
 ```json
 {
+  "backup_paths": [
+    {"path": "~/.clawdbot", "label": "config", "exclude": ["backups", "logs", "media", "*.lock"]},
+    {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules", ".venv"]}
+  ],
   "skills_dirs": [
-    {"path": "~/.clawdbot/skills", "label": "prod", "backup": true, "update": true},
-    {"path": "~/clawd/skills", "label": "dev", "backup": true, "update": false}
+    {"path": "~/.clawdbot/skills", "label": "prod", "update": true},
+    {"path": "~/clawd/skills", "label": "dev", "update": false}
   ]
 }
 ```
 
-### Options
+### backup_paths Options
 
 | Option | Description |
 |--------|-------------|
-| `path` | Directory path (supports `~` and `${HOME}`) |
-| `label` | Name shown in logs and backups |
-| `backup` | Include in backups (`true`/`false`) |
+| `path` | Directory to backup (supports `~` and `${HOME}`) |
+| `label` | Name shown in logs and backup structure |
+| `exclude` | Files/folders to exclude from backup |
+
+### skills_dirs Options
+
+| Option | Description |
+|--------|-------------|
+| `path` | Skills directory path |
+| `label` | Name shown in logs |
 | `update` | Run `git pull` on skills (`true`/`false`) |
 
-### Use Cases
+### Recommended Setup
 
-| Scenario | Backup | Update |
-|----------|--------|--------|
-| **Production** (ClawdHub installs) | ✅ | ✅ Auto-update |
-| **Development** (your code) | ✅ | ❌ Manual only |
+| What | backup_paths | skills_dirs |
+|------|--------------|-------------|
+| `~/.clawdbot` (config, credentials, tools) | ✅ Backup | - |
+| `~/clawd` (workspace, MEMORY.md, etc.) | ✅ Backup | - |
+| `~/.clawdbot/skills` (prod) | (included in config) | ✅ Update |
+| `~/clawd/skills` (dev) | (included in workspace) | ❌ No update |
 
-> **Note:** If `skills_dirs` is not set, the legacy `skills_dir` option is used with backup and update enabled.
+> **Note:** If `backup_paths` is not set, falls back to legacy `skills_dirs` backup behavior.
 
 ## Commands
 
@@ -509,6 +523,13 @@ rclone lsd your-remote:
 ```
 
 ## Changelog
+
+### v1.6.0
+- Added `backup_paths` for full environment backup
+- Backup config, workspace, and all files (not just skills)
+- Separated backup logic from update logic
+- Custom exclude patterns per backup path
+- Complete disaster recovery support
 
 ### v1.5.0
 - Added multi-directory support (`skills_dirs` config)

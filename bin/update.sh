@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Clawdbot Update Plus - Backup, Update, Restore
 # Author: hopyky
-# Version: 1.5.0
+# Version: 1.6.0
 # License: MIT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,6 +63,7 @@ load_config() {
   WORKSPACE="${WORKSPACE:-$WORKSPACE_DEFAULT}"
   SKILLS_DIR="${HOME}/.clawdbot/skills"
   SKILLS_DIRS_JSON=""
+  BACKUP_PATHS_JSON=""
   BACKUP_DIR="${BACKUP_DIR:-$BACKUP_DIR_DEFAULT}"
   AUTO_UPDATE="false"
   BACKUP_BEFORE_UPDATE="true"
@@ -96,19 +97,26 @@ load_config() {
     NOTIFY_ON_SUCCESS=$(jq -r '.notifications.on_success // "true"' "$CONFIG_FILE")
     NOTIFY_ON_ERROR=$(jq -r '.notifications.on_error // "true"' "$CONFIG_FILE")
 
-    # Check for new skills_dirs format (array) or legacy skills_dir (string)
+    # Load backup_paths (new full backup system)
+    if jq -e '.backup_paths' "$CONFIG_FILE" >/dev/null 2>&1; then
+      BACKUP_PATHS_JSON=$(jq -c '.backup_paths' "$CONFIG_FILE")
+    else
+      # Legacy: no backup_paths, will use skills_dirs for backup
+      BACKUP_PATHS_JSON=""
+    fi
+
+    # Load skills_dirs (for updates only now)
     if jq -e '.skills_dirs' "$CONFIG_FILE" >/dev/null 2>&1; then
-      # New format: skills_dirs array
       SKILLS_DIRS_JSON=$(jq -c '.skills_dirs' "$CONFIG_FILE")
     else
       # Legacy format: single skills_dir
       SKILLS_DIR=$(jq -r '.skills_dir // "'"${HOME}/.clawdbot/skills"'"' "$CONFIG_FILE")
-      # Convert to new format internally
-      SKILLS_DIRS_JSON=$(jq -n --arg path "$SKILLS_DIR" '[{path: $path, label: "default", backup: true, update: true}]')
+      SKILLS_DIRS_JSON=$(jq -n --arg path "$SKILLS_DIR" '[{path: $path, label: "default", update: true}]')
     fi
   else
     # No config file, use defaults
-    SKILLS_DIRS_JSON=$(jq -n --arg path "$SKILLS_DIR" '[{path: $path, label: "default", backup: true, update: true}]')
+    SKILLS_DIRS_JSON=$(jq -n --arg path "$SKILLS_DIR" '[{path: $path, label: "default", update: true}]')
+    BACKUP_PATHS_JSON=""
   fi
 
   # Ensure directories exist
@@ -235,13 +243,22 @@ create_backup() {
   local tmp_backup_dir=$(mktemp -d)
   local dirs_backed_up=0
 
+  # Determine what to backup: backup_paths (new) or skills_dirs (legacy)
+  local backup_source_json=""
+  if [[ -n "$BACKUP_PATHS_JSON" ]] && [[ "$BACKUP_PATHS_JSON" != "null" ]]; then
+    backup_source_json="$BACKUP_PATHS_JSON"
+  else
+    # Legacy fallback: use skills_dirs with backup=true
+    backup_source_json=$(echo "$SKILLS_DIRS_JSON" | jq -c '[.[] | select(.backup == true) | {path: .path, label: .label, exclude: [".venv", "node_modules", "*.pyc", "__pycache__"]}]')
+  fi
+
   if [[ "$DRY_RUN" == true ]]; then
     if [[ "$ENCRYPTION_ENABLED" == "true" ]]; then
       backup_name+=".gpg"
     fi
     log_dry_run "Would create backup: ${BACKUP_DIR}/${backup_name}"
     # Show which dirs would be backed up
-    echo "$SKILLS_DIRS_JSON" | jq -r '.[] | select(.backup == true) | "  → \(.label): \(.path)"' | while read -r line; do
+    echo "$backup_source_json" | jq -r '.[] | "  → \(.label): \(.path)"' | while read -r line; do
       log_dry_run "$line"
     done
     REPORT_JSON=$(echo "$REPORT_JSON" | jq '.backup = {status: "skipped", filename: $filename}' --arg filename "$backup_name")
@@ -251,18 +268,14 @@ create_backup() {
 
   log_info "Creating backup archive..."
 
-  # Iterate over skills_dirs with backup=true
+  # Iterate over backup paths
   while IFS= read -r dir_config; do
     local dir_path=$(echo "$dir_config" | jq -r '.path' | sed "s|\${HOME}|$HOME|g" | sed "s|~|$HOME|g")
     local dir_label=$(echo "$dir_config" | jq -r '.label')
-    local dir_backup=$(echo "$dir_config" | jq -r '.backup')
-
-    if [[ "$dir_backup" != "true" ]]; then
-      continue
-    fi
+    local dir_excludes=$(echo "$dir_config" | jq -r '.exclude // [] | .[]' 2>/dev/null)
 
     if [[ ! -d "$dir_path" ]]; then
-      log_warning "Skills directory not found: $dir_path ($dir_label), skipping"
+      log_warning "Directory not found: $dir_path ($dir_label), skipping"
       continue
     fi
 
@@ -271,15 +284,27 @@ create_backup() {
     # Create subdirectory in temp for this label
     mkdir -p "$tmp_backup_dir/$dir_label"
 
-    # Copy skills to temp dir (excluding unwanted files)
-    rsync -a --exclude='.venv' --exclude='node_modules' --exclude='*.pyc' --exclude='__pycache__' \
-      "$dir_path/" "$tmp_backup_dir/$dir_label/" 2>/dev/null || {
-        log_warning "Failed to backup $dir_label, continuing..."
-        continue
-      }
+    # Build rsync exclude arguments
+    local rsync_excludes=""
+    while IFS= read -r exclude; do
+      if [[ -n "$exclude" ]]; then
+        rsync_excludes+="--exclude=$exclude "
+      fi
+    done <<< "$dir_excludes"
+
+    # Default excludes if none specified
+    if [[ -z "$rsync_excludes" ]]; then
+      rsync_excludes="--exclude=.venv --exclude=node_modules --exclude=*.pyc --exclude=__pycache__"
+    fi
+
+    # Copy to temp dir
+    eval rsync -a $rsync_excludes "$dir_path/" "$tmp_backup_dir/$dir_label/" 2>/dev/null || {
+      log_warning "Failed to backup $dir_label, continuing..."
+      continue
+    }
 
     dirs_backed_up=$((dirs_backed_up + 1))
-  done < <(echo "$SKILLS_DIRS_JSON" | jq -c '.[]')
+  done < <(echo "$backup_source_json" | jq -c '.[]')
 
   if [[ $dirs_backed_up -eq 0 ]]; then
     log_error "No directories were backed up"
@@ -287,9 +312,6 @@ create_backup() {
     REPORT_JSON=$(echo "$REPORT_JSON" | jq '.backup = {status: "failed", error: "no directories backed up"}')
     return 1
   fi
-
-  # Add clawdbot config
-  cp "${HOME}/.clawdbot/clawdbot.json" "$tmp_backup_dir/" 2>/dev/null || true
 
   # Create tar archive
   tar -czf "$backup_path" -C "$tmp_backup_dir" . 2>/dev/null || {
@@ -685,7 +707,7 @@ send_notification() {
 # Show help
 show_help() {
   cat <<'EOF'
-Clawdbot Update Plus v1.5.0
+Clawdbot Update Plus v1.6.0
 Backup, update, and restore Clawdbot and all installed skills.
 
 USAGE
@@ -710,15 +732,19 @@ OPTIONS
   --json-report           Generate JSON report of the update
   --show-diffs            Show file changes for each updated skill
 
-MULTI-DIRECTORY SUPPORT
-  Configure multiple skills directories with separate backup/update settings:
-    "skills_dirs": [
-      {"path": "~/.clawdbot/skills", "label": "prod", "backup": true, "update": true},
-      {"path": "~/clawd/skills", "label": "dev", "backup": true, "update": false}
+FULL ENVIRONMENT BACKUP
+  Configure what to backup with backup_paths:
+    "backup_paths": [
+      {"path": "~/.clawdbot", "label": "config", "exclude": ["backups", "logs"]},
+      {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules"]}
     ]
 
-  - backup: Include this directory in backups
-  - update: Run git pull on skills in this directory
+SKILLS UPDATE
+  Configure which skills directories to update:
+    "skills_dirs": [
+      {"path": "~/.clawdbot/skills", "label": "prod", "update": true},
+      {"path": "~/clawd/skills", "label": "dev", "update": false}
+    ]
 
 NOTIFICATIONS
   Configure in ~/.clawdbot/clawdbot-update.json:
