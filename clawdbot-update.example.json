@@ -15,5 +15,11 @@
   "encryption": {
     "enabled": false,
     "gpg_recipient": "your-gpg-key-id-or-email"
+  },
+  "notifications": {
+    "enabled": false,
+    "target": "+1234567890",
+    "on_success": true,
+    "on_error": true
   }
 }

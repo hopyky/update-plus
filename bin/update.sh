@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Clawdbot Update Plus - Backup, Update, Restore
 # Author: hopyky
-# Version: 1.3.0
+# Version: 1.4.0
 # License: MIT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -72,6 +72,10 @@ load_config() {
   REMOTE_STORAGE_PATH=""
   ENCRYPTION_ENABLED="false"
   GPG_RECIPIENT=""
+  NOTIFY_ENABLED="false"
+  NOTIFY_TARGET=""
+  NOTIFY_ON_SUCCESS="true"
+  NOTIFY_ON_ERROR="true"
 
   # Then try to load from JSON config
   if [[ -f "$CONFIG_FILE" ]]; then
@@ -87,6 +91,10 @@ load_config() {
     REMOTE_STORAGE_PATH=$(jq -r '.remote_storage.path // ""' "$CONFIG_FILE")
     ENCRYPTION_ENABLED=$(jq -r '.encryption.enabled // "false"' "$CONFIG_FILE")
     GPG_RECIPIENT=$(jq -r '.encryption.gpg_recipient // ""' "$CONFIG_FILE")
+    NOTIFY_ENABLED=$(jq -r '.notifications.enabled // "false"' "$CONFIG_FILE")
+    NOTIFY_TARGET=$(jq -r '.notifications.target // ""' "$CONFIG_FILE")
+    NOTIFY_ON_SUCCESS=$(jq -r '.notifications.on_success // "true"' "$CONFIG_FILE")
+    NOTIFY_ON_ERROR=$(jq -r '.notifications.on_error // "true"' "$CONFIG_FILE")
   fi
 
   # Ensure directories exist
@@ -539,12 +547,34 @@ list_backups() {
 
 # Send notification via Clawdbot
 send_notification() {
-  if [[ "$DRY_RUN" == true ]]; then
-    log_dry_run "Would send notification to Clawdbot"
+  local status="$1"  # "success" or "error"
+  local details="${2:-}"
+
+  # Check if notifications are enabled
+  if [[ "$NOTIFY_ENABLED" != "true" ]] && [[ "$NOTIFICATION_ENABLED" != "true" ]]; then
     return 0
   fi
 
-  log_info "Sending notification to Clawdbot..."
+  # Check notification type preference
+  if [[ "$status" == "success" ]] && [[ "$NOTIFY_ON_SUCCESS" != "true" ]]; then
+    return 0
+  fi
+  if [[ "$status" == "error" ]] && [[ "$NOTIFY_ON_ERROR" != "true" ]]; then
+    return 0
+  fi
+
+  # Check if target is configured
+  if [[ -z "$NOTIFY_TARGET" ]]; then
+    log_warning "Notification enabled but no target configured"
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" == true ]]; then
+    log_dry_run "Would send notification to $NOTIFY_TARGET"
+    return 0
+  fi
+
+  log_info "Sending notification..."
 
   # Check if clawdbot command is available
   if ! command -v clawdbot &>/dev/null; then
@@ -552,21 +582,28 @@ send_notification() {
     return 0
   fi
 
-  # Read log file
-  local log_content=$(cat "$LOG_FILE" 2>/dev/null || echo "No log available")
-
-  # Get summary
-  local summary="🔄 Clawdbot Update Report\n\n"
-  summary+="$(tail -20 "$LOG_FILE" 2>/dev/null || echo "No logs available")\n\n"
-  summary+="Log file: $LOG_FILE"
-
-  # Try to send via message tool
-  # Note: This will work if Clawdbot gateway is running
-  if clawdbot message send --message "$summary" 2>/dev/null; then
-    log_success "Notification sent successfully"
-    log_to_file "Notification sent successfully"
+  # Build message based on status
+  local message=""
+  if [[ "$status" == "success" ]]; then
+    message="✅ *Clawdbot Update Complete*"
+    message+="\n\n📦 Skills and Clawdbot updated successfully."
   else
-    log_warning "Could not send notification (gateway may not be running)"
+    message="❌ *Clawdbot Update Failed*"
+    message+="\n\n⚠️ An error occurred during the update."
+  fi
+
+  if [[ -n "$details" ]]; then
+    message+="\n\n$details"
+  fi
+
+  message+="\n\n🕐 $(date '+%Y-%m-%d %H:%M:%S')"
+
+  # Send via clawdbot message
+  if clawdbot message send --target "$NOTIFY_TARGET" --message "$message" 2>/dev/null; then
+    log_success "Notification sent to $NOTIFY_TARGET"
+    log_to_file "Notification sent to $NOTIFY_TARGET"
+  else
+    log_warning "Could not send notification (check gateway status)"
     log_to_file "WARNING: Could not send notification"
   fi
 }
@@ -574,7 +611,7 @@ send_notification() {
 # Show help
 show_help() {
   cat <<'EOF'
-Clawdbot Update Plus v1.3.0
+Clawdbot Update Plus v1.4.0
 Backup, update, and restore Clawdbot and all installed skills.
 
 USAGE
@@ -595,9 +632,23 @@ OPTIONS
   --no-backup             Skip backup before update
   --no-check-disk         Skip disk space check
   --force                 Continue even if backup fails or skip confirmation
-  --notify                Send notification after update
+  --notify                Force send notification (overrides config)
   --json-report           Generate JSON report of the update
   --show-diffs            Show file changes for each updated skill
+
+NOTIFICATIONS
+  Configure in ~/.clawdbot/clawdbot-update.json:
+    "notifications": {
+      "enabled": true,
+      "target": "+1234567890",
+      "on_success": true,
+      "on_error": true
+    }
+
+  Target format determines channel (handled by Clawdbot):
+    +1234567890     → WhatsApp
+    @username       → Telegram
+    channel:123     → Discord
 
 EXAMPLES
   # Create a backup
@@ -627,7 +678,7 @@ AUTO-UPDATE (cron)
   0 2 * * * ~/.clawdbot/skills/clawdbot-update-plus/bin/update.sh update
 
 For full documentation, see SKILL.md or visit:
-  https://github.com/YOUR_USER/clawdbot-update-plus
+  https://github.com/hopyky/clawdbot-update-plus
 EOF
 }
 
@@ -953,10 +1004,16 @@ main() {
       REPORT_JSON=$(jq -n '{run_timestamp: (now | todate), status: "pending", clawdbot_update: {}, skills_updated: [], skills_failed: [], backup: {}}')
 
       # Check disk space
-      check_disk_space || return 1
+      if ! check_disk_space; then
+        send_notification "error" "Insufficient disk space"
+        exit 1
+      fi
 
       # Check internet connection
-      check_connection || return 1
+      if ! check_connection; then
+        send_notification "error" "No internet connection"
+        exit 1
+      fi
 
       # Create backup if enabled
       local backup_name=""
@@ -966,6 +1023,7 @@ main() {
                 log_warning "Backup failed, but --force is enabled. Continuing without backup."
             else
                 log_error "Backup failed. Use --force to continue without backup."
+                send_notification "error" "Backup creation failed"
                 exit 1
             fi
         fi
@@ -979,6 +1037,7 @@ main() {
           else
               log_error "No backup available to restore from."
           fi
+          send_notification "error" "Clawdbot update failed"
           exit 1
       fi
 
@@ -994,10 +1053,8 @@ main() {
         log_to_file "Backup created: $backup_name"
       fi
 
-      # Send notification if enabled
-      if [[ "$do_notify" == true ]]; then
-        send_notification
-      fi
+      # Send success notification
+      send_notification "success" "Backup: ${backup_name:-none}"
 
       # Clean old logs
       clean_logs

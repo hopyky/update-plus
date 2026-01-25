@@ -1,7 +1,7 @@
 ---
 name: clawdbot-update-plus
 description: Backup, update, and restore Clawdbot and all installed skills with auto-rollback and cloud sync
-version: 1.3.0
+version: 1.4.0
 metadata: {"clawdbot":{"emoji":"🔄","requires":{"bins":["git","jq"],"commands":["clawdbot"]}}}
 ---
 
@@ -40,6 +40,7 @@ clawdbot update-plus restore clawdbot-update-2026-01-25-12:00:00.tar.gz
 | **Retention Policy** | Automatically deletes old backups (local + remote) |
 | **JSON Reports** | Generate detailed update reports for automation |
 | **Dry Run Mode** | Preview changes without modifying anything |
+| **Notifications** | Get notified on success/error via WhatsApp, Telegram, or Discord |
 
 ## Installation
 
@@ -80,6 +81,12 @@ Create `~/.clawdbot/clawdbot-update.json`:
   "encryption": {
     "enabled": false,
     "gpg_recipient": "your-email@example.com"
+  },
+  "notifications": {
+    "enabled": false,
+    "target": "+1234567890",
+    "on_success": true,
+    "on_error": true
   }
 }
 ```
@@ -281,6 +288,52 @@ clawdbot update-plus backup
 
 Encrypted backups show a 🔒 icon in `list-backups`.
 
+## Notifications
+
+Get notified when updates complete or fail. Notifications are sent via Clawdbot's messaging system, supporting WhatsApp, Telegram, and Discord.
+
+### Enable Notifications
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "target": "+1234567890",
+    "on_success": true,
+    "on_error": true
+  }
+}
+```
+
+### Target Format
+
+The target format determines which channel Clawdbot uses:
+
+| Format | Channel |
+|--------|---------|
+| `+1234567890` | WhatsApp |
+| `@username` | Telegram |
+| `channel:123456` | Discord |
+
+### Notification Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Enable/disable notifications |
+| `target` | `""` | Recipient (phone, username, or channel ID) |
+| `on_success` | `true` | Notify when update succeeds |
+| `on_error` | `true` | Notify when update fails |
+
+### Force Notification
+
+Use `--notify` flag to send a notification even if disabled in config:
+
+```bash
+clawdbot update-plus update --notify
+```
+
+> **Tip:** Enable notifications with `on_error: true` for cron jobs to get alerted when automatic updates fail.
+
 ## Automatic Updates (Cron)
 
 ### Install Cron Job
@@ -422,6 +475,12 @@ rclone lsd your-remote:
 ```
 
 ## Changelog
+
+### v1.4.0
+- Added notifications via Clawdbot messaging (WhatsApp, Telegram, Discord)
+- Notifications on both success and error
+- Configurable notification preferences in JSON config
+- `--notify` flag to force notifications
 
 ### v1.3.0
 - Added `check` command to see available updates
