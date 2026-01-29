@@ -1,20 +1,20 @@
 {
-  "backup_dir": "~/.clawdbot/backups",
+  "backup_dir": "~/.moltbot/backups",
   "backup_before_update": true,
   "backup_count": 5,
   "excluded_skills": [],
   "backup_paths": [
-    {"path": "~/.clawdbot", "label": "config", "exclude": ["backups", "logs", "media", "*.lock"]},
+    {"path": "~/.moltbot", "label": "config", "exclude": ["backups", "logs", "media", "*.lock"]},
     {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules", ".venv", "__pycache__"]}
   ],
   "skills_dirs": [
-    {"path": "~/.clawdbot/skills", "label": "prod", "update": true},
+    {"path": "~/.moltbot/skills", "label": "prod", "update": true},
     {"path": "~/clawd/skills", "label": "dev", "update": false}
   ],
   "remote_storage": {
     "enabled": false,
     "rclone_remote": "gdrive:",
-    "path": "clawdbot-backups"
+    "path": "moltbot-backups"
   },
   "encryption": {
     "enabled": false,
@@ -25,5 +25,7 @@
     "target": "+1234567890",
     "on_success": true,
     "on_error": true
-  }
+  },
+  "connection_retries": 3,
+  "connection_retry_delay": 60
 }

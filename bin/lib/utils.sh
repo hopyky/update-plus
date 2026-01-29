@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Clawdbot Update Plus - Utility functions
-# Version: 2.1.1
+# Update Plus - Utility functions
+# Version: 3.0.0
+# Supports both moltbot and clawdbot
 
 # Colors for output
 RED='\033[0;31m'
@@ -86,15 +87,31 @@ check_disk_space() {
   return 0
 }
 
-# Check internet connection
+# Check internet connection with retry
 check_connection() {
+  local max_retries="${CONNECTION_RETRIES:-3}"
+  local retry_delay="${CONNECTION_RETRY_DELAY:-60}"  # seconds
+  local attempt=1
+
   log_info "Checking internet connection..."
-  if ! ping -c 1 github.com &> /dev/null; then
-    log_error "No internet connection detected."
-    return 1
-  fi
-  log_success "Internet connection is available."
-  return 0
+
+  while [[ $attempt -le $max_retries ]]; do
+    if ping -c 1 -W 5 github.com &> /dev/null || ping -c 1 -W 5 8.8.8.8 &> /dev/null; then
+      log_success "Internet connection is available."
+      return 0
+    fi
+
+    if [[ $attempt -lt $max_retries ]]; then
+      log_warning "No internet connection (attempt $attempt/$max_retries). Retrying in ${retry_delay}s..."
+      log_to_file "Connection attempt $attempt failed, waiting ${retry_delay}s"
+      sleep "$retry_delay"
+    fi
+
+    attempt=$((attempt + 1))
+  done
+
+  log_error "No internet connection after $max_retries attempts."
+  return 1
 }
 
 # Check if skill is in excluded list

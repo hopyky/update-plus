@@ -1,12 +1,56 @@
 #!/usr/bin/env bash
-# Clawdbot Update Plus - Configuration management
-# Version: 2.1.1
+# Update Plus - Configuration management
+# Version: 3.0.0
+# Supports both moltbot and clawdbot
 
-# Default paths
+# Detect which bot is installed (moltbot preferred, clawdbot as fallback)
+detect_bot_name() {
+  if command -v moltbot &>/dev/null; then
+    echo "moltbot"
+  elif command -v clawdbot &>/dev/null; then
+    echo "clawdbot"
+  else
+    # Check common paths
+    if [[ -d "${HOME}/.moltbot" ]]; then
+      echo "moltbot"
+    elif [[ -d "${HOME}/.clawdbot" ]]; then
+      echo "clawdbot"
+    else
+      echo "moltbot"  # Default to new name
+    fi
+  fi
+}
+
+# Bot name (moltbot or clawdbot)
+BOT_NAME=$(detect_bot_name)
+BOT_NAME_UPPER=$(echo "$BOT_NAME" | tr '[:lower:]' '[:upper:]')
+
+# Default paths (adapt based on detected bot)
 WORKSPACE_DEFAULT="${HOME}/clawd"
-BACKUP_DIR_DEFAULT="${HOME}/.clawdbot/backups"
-CONFIG_FILE="${HOME}/.clawdbot/clawdbot-update.json"
-LOG_FILE="${HOME}/.clawdbot/backups/update.log"
+if [[ "$BOT_NAME" == "moltbot" ]]; then
+  BOT_DIR="${HOME}/.moltbot"
+  # Also check legacy .clawdbot if .moltbot doesn't exist
+  [[ ! -d "$BOT_DIR" ]] && [[ -d "${HOME}/.clawdbot" ]] && BOT_DIR="${HOME}/.clawdbot"
+else
+  BOT_DIR="${HOME}/.clawdbot"
+fi
+
+BACKUP_DIR_DEFAULT="${BOT_DIR}/backups"
+
+# Config file (searched in order: update-plus.json first, then legacy names)
+if [[ -f "${HOME}/.moltbot/update-plus.json" ]]; then
+  CONFIG_FILE="${HOME}/.moltbot/update-plus.json"
+elif [[ -f "${HOME}/.clawdbot/update-plus.json" ]]; then
+  CONFIG_FILE="${HOME}/.clawdbot/update-plus.json"
+elif [[ -f "${HOME}/.moltbot/moltbot-update.json" ]]; then
+  CONFIG_FILE="${HOME}/.moltbot/moltbot-update.json"
+elif [[ -f "${HOME}/.clawdbot/clawdbot-update.json" ]]; then
+  CONFIG_FILE="${HOME}/.clawdbot/clawdbot-update.json"
+else
+  CONFIG_FILE="${BOT_DIR}/update-plus.json"
+fi
+
+LOG_FILE="${BACKUP_DIR_DEFAULT}/update.log"
 
 # Load configuration from JSON
 load_config() {
@@ -39,6 +83,10 @@ load_config() {
   NOTIFY_ON_SUCCESS="true"
   NOTIFY_ON_ERROR="true"
 
+  # Connection retry settings
+  CONNECTION_RETRIES="3"
+  CONNECTION_RETRY_DELAY="60"
+
   # Load from JSON config if exists
   if [[ -f "$CONFIG_FILE" ]]; then
     WORKSPACE=$(jq -r '.workspace // "'"$WORKSPACE_DEFAULT"'"' "$CONFIG_FILE")
@@ -63,6 +111,10 @@ load_config() {
     NOTIFY_ON_SUCCESS=$(jq -r '.notifications.on_success // "true"' "$CONFIG_FILE")
     NOTIFY_ON_ERROR=$(jq -r '.notifications.on_error // "true"' "$CONFIG_FILE")
 
+    # Connection retry settings
+    CONNECTION_RETRIES=$(jq -r '.connection_retries // 3' "$CONFIG_FILE")
+    CONNECTION_RETRY_DELAY=$(jq -r '.connection_retry_delay // 60' "$CONFIG_FILE")
+
     # Load backup_paths (v2 format)
     if jq -e '.backup_paths' "$CONFIG_FILE" >/dev/null 2>&1; then
       BACKUP_PATHS_JSON=$(jq -c '.backup_paths' "$CONFIG_FILE")
@@ -77,8 +129,12 @@ load_config() {
       SKILLS_DIRS_JSON=$(jq -n --arg path "$skills_dir" '[{path: $path, label: "default", update: true}]')
     fi
   else
-    # No config file, use defaults
-    SKILLS_DIRS_JSON=$(jq -n '[{path: "~/.clawdbot/skills", label: "default", update: true}]')
+    # No config file, use defaults (try moltbot path first, then clawdbot)
+    if [[ -d "${HOME}/.moltbot/skills" ]]; then
+      SKILLS_DIRS_JSON=$(jq -n '[{path: "~/.moltbot/skills", label: "default", update: true}]')
+    else
+      SKILLS_DIRS_JSON=$(jq -n '[{path: "~/.clawdbot/skills", label: "default", update: true}]')
+    fi
   fi
 
   # Ensure directories exist

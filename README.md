@@ -1,24 +1,26 @@
-# Clawdbot Update Plus
+# Update Plus
 
-A comprehensive backup, update, and restore tool for your entire Clawdbot environment. Protect your config, workspace, and skills with automatic rollback, encrypted backups, and cloud sync.
+A comprehensive backup, update, and restore tool for your entire Moltbot/Clawdbot environment. Protect your config, workspace, and skills with automatic rollback, encrypted backups, and cloud sync.
+
+**Auto-detect**: Works with both `moltbot` and `clawdbot`.
 
 ## Quick Start
 
 ```bash
 # Check for available updates
-clawdbot-update-plus check
+update-plus check
 
 # Create a full backup
-clawdbot-update-plus backup
+update-plus backup
 
 # Update everything (creates backup first)
-clawdbot-update-plus update
+update-plus update
 
 # Preview changes (no modifications)
-clawdbot-update-plus update --dry-run
+update-plus update --dry-run
 
 # Restore from backup
-clawdbot-update-plus restore clawdbot-update-2026-01-25-12:00:00.tar.gz
+update-plus restore update-plus-2026-01-25-12:00:00.tar.gz
 ```
 
 ## Features
@@ -33,16 +35,14 @@ clawdbot-update-plus restore clawdbot-update-2026-01-25-12:00:00.tar.gz
 | **Encrypted Backups** | Optional GPG encryption |
 | **Cloud Sync** | Upload backups to Google Drive, S3, Dropbox via rclone |
 | **Notifications** | Get notified via WhatsApp, Telegram, or Discord |
-| **Modular Architecture** | Clean, maintainable codebase |
+| **Connection Retry** | Auto-retry on network failure (configurable) |
+| **Bot Auto-detect** | Works with moltbot and clawdbot |
 
 ## Installation
 
 ```bash
-# Via ClawdHub
-clawdhub install clawdbot-update-plus --dir ~/.clawdbot/skills
-
-# Or clone manually
-git clone https://github.com/hopyky/clawdbot-update-plus.git ~/.clawdbot/skills/clawdbot-update-plus
+# Clone manually
+git clone https://github.com/hopyky/update-plus.git ~/.moltbot/skills/update-plus
 ```
 
 ### Add to PATH
@@ -53,7 +53,7 @@ Create a symlink to use the command globally:
 mkdir -p ~/bin
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc  # or ~/.bashrc
 source ~/.zshrc
-ln -sf ~/.clawdbot/skills/clawdbot-update-plus/bin/clawdbot-update-plus ~/bin/clawdbot-update-plus
+ln -sf ~/.moltbot/skills/update-plus/bin/update-plus ~/bin/update-plus
 ```
 
 ### Dependencies
@@ -68,25 +68,25 @@ ln -sf ~/.clawdbot/skills/clawdbot-update-plus/bin/clawdbot-update-plus ~/bin/cl
 
 ## Configuration
 
-Create `~/.clawdbot/clawdbot-update.json`:
+Create `~/.moltbot/update-plus.json` (or `~/.clawdbot/update-plus.json`):
 
 ```json
 {
-  "backup_dir": "~/.clawdbot/backups",
+  "backup_dir": "~/.moltbot/backups",
   "backup_before_update": true,
   "backup_count": 5,
   "backup_paths": [
-    {"path": "~/.clawdbot", "label": "config", "exclude": ["backups", "logs", "media", "*.lock"]},
+    {"path": "~/.moltbot", "label": "config", "exclude": ["backups", "logs", "media", "*.lock"]},
     {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules", ".venv"]}
   ],
   "skills_dirs": [
-    {"path": "~/.clawdbot/skills", "label": "prod", "update": true},
+    {"path": "~/.moltbot/skills", "label": "prod", "update": true},
     {"path": "~/clawd/skills", "label": "dev", "update": false}
   ],
   "remote_storage": {
     "enabled": false,
     "rclone_remote": "gdrive:",
-    "path": "clawdbot-backups"
+    "path": "moltbot-backups"
   },
   "encryption": {
     "enabled": false,
@@ -97,114 +97,91 @@ Create `~/.clawdbot/clawdbot-update.json`:
     "target": "+1234567890",
     "on_success": true,
     "on_error": true
-  }
+  },
+  "connection_retries": 3,
+  "connection_retry_delay": 60
 }
 ```
 
-## Backup Paths
+### Config file locations (searched in order)
 
-Configure what to backup with `backup_paths`:
+1. `~/.moltbot/update-plus.json`
+2. `~/.clawdbot/update-plus.json`
+3. `~/.moltbot/moltbot-update.json` (legacy)
+4. `~/.clawdbot/clawdbot-update.json` (legacy)
 
-| Option | Description |
-|--------|-------------|
-| `path` | Directory to backup (supports `~`) |
-| `label` | Name in logs and restore |
-| `exclude` | Files/folders to exclude |
+## Connection Retry
 
-### Recommended Setup
+For cron jobs running at night when the network might be unstable:
 
-```json
-"backup_paths": [
-  {"path": "~/.clawdbot", "label": "config", "exclude": ["backups", "logs", "media"]},
-  {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules", ".venv"]}
-]
-```
-
-## Skills Update
-
-Configure which skills to update with `skills_dirs`:
-
-| Option | Description |
-|--------|-------------|
-| `path` | Skills directory |
-| `label` | Name in logs |
-| `update` | Run `git pull` (true/false) |
-
-### Recommended Setup
-
-```json
-"skills_dirs": [
-  {"path": "~/.clawdbot/skills", "label": "prod", "update": true},
-  {"path": "~/clawd/skills", "label": "dev", "update": false}
-]
-```
-
-- **Prod**: Auto-update from ClawdHub/GitHub
-- **Dev**: Manual only (protects your work)
+| Option | Default | Description |
+|--------|---------|-------------|
+| `connection_retries` | 3 | Number of retry attempts |
+| `connection_retry_delay` | 60 | Seconds between retries |
 
 ## Commands
 
 ### `backup` — Create Full Backup
 
 ```bash
-clawdbot-update-plus backup
+update-plus backup
 ```
 
 ### `list-backups` — List Available Backups
 
 ```bash
-clawdbot-update-plus list-backups
+update-plus list-backups
 ```
 
 ### `update` — Update Everything
 
 ```bash
 # Standard update (with automatic backup)
-clawdbot-update-plus update
+update-plus update
 
 # Preview changes only
-clawdbot-update-plus update --dry-run
+update-plus update --dry-run
 
 # Skip backup
-clawdbot-update-plus update --no-backup
+update-plus update --no-backup
 
 # Force continue even if backup fails
-clawdbot-update-plus update --force
+update-plus update --force
 ```
 
 ### `restore` — Restore from Backup
 
 ```bash
 # Restore everything
-clawdbot-update-plus restore backup.tar.gz
+update-plus restore backup.tar.gz
 
 # Restore only config
-clawdbot-update-plus restore backup.tar.gz config
+update-plus restore backup.tar.gz config
 
 # Restore only workspace
-clawdbot-update-plus restore backup.tar.gz workspace
+update-plus restore backup.tar.gz workspace
 
 # Force (no confirmation)
-clawdbot-update-plus restore backup.tar.gz --force
+update-plus restore backup.tar.gz --force
 ```
 
 ### `check` — Check for Updates
 
 ```bash
-clawdbot-update-plus check
+update-plus check
 ```
 
 ### `install-cron` — Automatic Updates
 
 ```bash
 # Install daily at 2 AM
-clawdbot-update-plus install-cron
+update-plus install-cron
 
 # Custom schedule
-clawdbot-update-plus install-cron "0 3 * * 0"  # Sundays at 3 AM
+update-plus install-cron "0 3 * * 0"  # Sundays at 3 AM
 
 # Remove
-clawdbot-update-plus uninstall-cron
+update-plus uninstall-cron
 ```
 
 ## Notifications
@@ -244,49 +221,35 @@ rclone config
 "remote_storage": {
   "enabled": true,
   "rclone_remote": "gdrive:",
-  "path": "clawdbot-backups"
-}
-```
-
-## Encrypted Backups
-
-```json
-"encryption": {
-  "enabled": true,
-  "gpg_recipient": "your-email@example.com"
+  "path": "moltbot-backups"
 }
 ```
 
 ## Logs
 
-All operations are logged to `~/.clawdbot/backups/update.log`:
+All operations are logged to `~/.moltbot/backups/update.log`:
 
 ```
 [2026-01-25 20:22:48] === Update started 2026-01-25 20:22:48 ===
 [2026-01-25 20:23:39] Creating backup...
-[2026-01-25 20:23:39] Backup created: clawdbot-update-2026-01-25-20:22:48.tar.gz (625M)
+[2026-01-25 20:23:39] Backup created: update-plus-2026-01-25-20:22:48.tar.gz (625M)
+[2026-01-25 20:23:39] moltbot current version: 2026.1.22
+[2026-01-25 20:23:41] Starting skills update
 [2026-01-25 20:23:41] === Update completed 2026-01-25 20:23:41 ===
-[2026-01-25 20:23:43] Notification sent to +1234567890 via whatsapp
 ```
 
 **Log retention**: Logs older than 30 days are automatically deleted.
 
-## Retention Policy
-
-| Type | Retention | Config |
-|------|-----------|--------|
-| Backups (local) | Last N backups | `backup_count: 5` |
-| Backups (remote) | Last N backups | Same as local |
-| Logs | 30 days | Automatic |
-
-## Architecture (v2.0)
+## Architecture (v3.0)
 
 ```
 bin/
-├── clawdbot-update-plus     # Main entry point
+├── update-plus              # Main entry point
+├── moltbot-update-plus      # Symlink (compatibility)
+├── clawdbot-update-plus     # Symlink (compatibility)
 └── lib/
-    ├── utils.sh             # Logging, helpers
-    ├── config.sh            # Configuration
+    ├── utils.sh             # Logging, helpers, connection retry
+    ├── config.sh            # Configuration (auto-detect bot)
     ├── backup.sh            # Backup functions
     ├── restore.sh           # Restore functions
     ├── update.sh            # Update functions
@@ -296,33 +259,41 @@ bin/
 
 ## Changelog
 
+### v3.0.0
+- Renamed to `update-plus` (simpler, bot-agnostic)
+- Config file: `update-plus.json` (with legacy fallback)
+- Auto-detect bot (moltbot preferred, clawdbot fallback)
+- Connection retry with configurable attempts and delay
+- Improved cron PATH handling for all package managers
+- Compatibility symlinks for `moltbot-update-plus` and `clawdbot-update-plus`
+
+### v2.1.x
+- Fix pnpm launcher bug workaround
+- Smart package manager detection
+
 ### v2.0.0
 - Complete architecture rewrite
 - Modular design (7 separate modules)
-- Cleaner codebase (~150 lines per module vs 1000+ monolith)
-- Better error handling
-- Improved restore with label support
-- Auto-detect notification channel from target format
-- Fixed `--no-backup` flag being ignored
-- Detailed logging to file with auto-purge
-- Backup retention policy (local + remote)
 
-### v1.7.0
-- Smart restore with label support
-- Auto-detect backup format
+## Migration from clawdbot-update-plus
 
-### v1.6.0
-- Added `backup_paths` for full environment backup
-- Separated backup logic from update logic
+1. Rename your config file:
+   ```bash
+   mv ~/.clawdbot/clawdbot-update.json ~/.clawdbot/update-plus.json
+   # or for moltbot:
+   mv ~/.moltbot/moltbot-update.json ~/.moltbot/update-plus.json
+   ```
 
-### v1.5.0
-- Multi-directory support (`skills_dirs`)
+2. Update your cron job:
+   ```bash
+   update-plus uninstall-cron
+   update-plus install-cron
+   ```
 
-### v1.4.0
-- Notifications via Clawdbot messaging
-
-### v1.3.0
-- Added `check`, `diff-backups`, `install-cron` commands
+3. Update your PATH symlink:
+   ```bash
+   ln -sf ~/.moltbot/skills/update-plus/bin/update-plus ~/bin/update-plus
+   ```
 
 ## Author
 
