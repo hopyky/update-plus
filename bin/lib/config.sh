@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update Plus - Configuration management
-# Version: 4.0.0
+# Version: 4.0.1
 # For OpenClaw
 
 # Bot name

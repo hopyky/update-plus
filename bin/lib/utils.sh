@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update Plus - Utility functions
-# Version: 4.0.0
+# Version: 4.0.1
 # For OpenClaw
 
 # Colors for output

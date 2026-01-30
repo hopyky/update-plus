@@ -202,6 +202,11 @@ bin/
 
 ## Changelog
 
+### v4.0.1
+- Added Homebrew path detection (`/opt/homebrew/bin`) for cron jobs
+- Added `~/bin` to cron PATH for local symlinks
+- Updated example config with clearer workspace structure
+
 ### v4.0.0
 - OpenClaw only (removed moltbot/clawdbot legacy support)
 - Simplified configuration and paths

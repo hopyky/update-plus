@@ -1,7 +1,7 @@
 ---
 name: update-plus
 description: Full backup, update, and restore for OpenClaw - config, workspace, and skills with auto-rollback
-version: 4.0.0
+version: 4.0.1
 metadata: {"openclaw":{"emoji":"🔄","requires":{"bins":["git","jq","rsync"]}}}
 ---
 
@@ -95,6 +95,11 @@ Create `~/.openclaw/update-plus.json`:
 | `update-plus uninstall-cron` | Remove cron job |
 
 ## Changelog
+
+### v4.0.1
+- Added Homebrew path detection (`/opt/homebrew/bin`) for cron jobs
+- Added `~/bin` to cron PATH for local symlinks
+- Updated example config with clearer workspace structure
 
 ### v4.0.0
 - OpenClaw only (removed moltbot/clawdbot legacy support)

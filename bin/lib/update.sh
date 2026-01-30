@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update Plus - Update functions
-# Version: 4.0.0
+# Version: 4.0.1
 # For OpenClaw
 
 # Global tracking

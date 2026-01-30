@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update Plus - Restore functions
-# Version: 4.0.0
+# Version: 4.0.1
 # For OpenClaw
 
 # Restore from backup

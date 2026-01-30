@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update Plus - Cron management functions
-# Version: 4.0.0
+# Version: 4.0.1
 # For OpenClaw
 
 # Install cron job for automatic updates
@@ -12,7 +12,9 @@ install_cron() {
 
   # Build PATH for cron environment (cron has minimal PATH by default)
   local cron_path="/usr/local/bin:/usr/bin:/bin"
+  [[ -d "/opt/homebrew/bin" ]] && cron_path="/opt/homebrew/bin:${cron_path}"
   [[ -d "${HOME}/.openclaw/bin" ]] && cron_path="${HOME}/.openclaw/bin:${cron_path}"
+  [[ -d "${HOME}/bin" ]] && cron_path="${HOME}/bin:${cron_path}"
   [[ -d "${HOME}/Library/pnpm" ]] && cron_path="${HOME}/Library/pnpm:${cron_path}"
   [[ -d "${HOME}/.npm-global/bin" ]] && cron_path="${HOME}/.npm-global/bin:${cron_path}"
   [[ -d "${HOME}/.yarn/bin" ]] && cron_path="${HOME}/.yarn/bin:${cron_path}"
