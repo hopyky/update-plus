@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Update Plus - Restore functions
-# Version: 3.1.0
-# Supports openclaw, moltbot, and clawdbot
+# Version: 4.0.0
+# For OpenClaw
 
 # Restore from backup
 restore_backup() {

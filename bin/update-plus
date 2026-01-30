@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Update Plus v3.1.0
-# Full backup, update, and restore for OpenClaw/Moltbot/Clawdbot
+# Update Plus v4.0.0
+# Full backup, update, and restore for OpenClaw
 # Author: hopyky
 # License: MIT
 
@@ -33,14 +33,14 @@ NO_BACKUP_CLI=false
 
 # Show version
 show_version() {
-  echo "Update Plus v3.1.0"
+  echo "Update Plus v4.0.0"
 }
 
 # Show help
 show_help() {
   cat <<'EOF'
-Update Plus v3.1.0
-Full backup, update, and restore for OpenClaw/Moltbot/Clawdbot.
+Update Plus v4.0.0
+Full backup, update, and restore for OpenClaw.
 
 USAGE
   update-plus <command> [options]
@@ -48,7 +48,7 @@ USAGE
 COMMANDS
   backup                       Create a backup of configured paths
   list-backups                 List available backups
-  update                       Update bot and all skills (with backup)
+  update                       Update OpenClaw and all skills (with backup)
   restore <id> [label]         Restore from backup (optionally specific label)
   diff-backups <a> <b>         Compare two backups
   check                        Check for available updates
@@ -65,13 +65,7 @@ OPTIONS
   -v, --version           Show version
 
 CONFIGURATION
-  Config file location (searched in order):
-    1. ~/.openclaw/update-plus.json
-    2. ~/.moltbot/update-plus.json
-    3. ~/.clawdbot/update-plus.json
-    4. ~/.openclaw/openclaw-update.json (legacy)
-    5. ~/.moltbot/moltbot-update.json   (legacy)
-    6. ~/.clawdbot/clawdbot-update.json (legacy)
+  Config file: ~/.openclaw/update-plus.json
 
   Example config:
     {
@@ -80,7 +74,7 @@ CONFIGURATION
       "backup_count": 5,
       "backup_paths": [
         {"path": "~/.openclaw", "label": "config", "exclude": ["backups", "logs"]},
-        {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules"]}
+        {"path": "~/.openclaw/workspace", "label": "workspace", "exclude": ["node_modules"]}
       ],
       "skills_dirs": [
         {"path": "~/.openclaw/skills", "label": "prod", "update": true}
@@ -100,11 +94,6 @@ EXAMPLES
   update-plus restore backup.tar.gz config
   update-plus check
   update-plus install-cron "0 3 * * *"
-
-ALIASES
-  This command is also available as:
-    - moltbot-update-plus
-    - clawdbot-update-plus
 
 For full documentation: https://github.com/hopyky/update-plus
 EOF
@@ -251,10 +240,10 @@ cmd_update() {
     fi
   fi
 
-  # Update bot (moltbot or clawdbot)
+  # Update OpenClaw
   if ! update_bot; then
-    log_error "$BOT_NAME update failed"
-    send_notification "error" "$BOT_NAME update failed"
+    log_error "OpenClaw update failed"
+    send_notification "error" "OpenClaw update failed"
     exit 1
   fi
 
@@ -264,9 +253,9 @@ cmd_update() {
   # Build summary
   local summary=""
   if [[ "$BOT_UPDATED" == true ]]; then
-    summary+="${BOT_NAME}: updated\n"
+    summary+="OpenClaw: updated\n"
   else
-    summary+="${BOT_NAME}: no update\n"
+    summary+="OpenClaw: no update\n"
   fi
 
   if [[ "$SKILLS_UPDATED" -gt 0 ]]; then

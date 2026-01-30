@@ -1,15 +1,13 @@
 ---
 name: update-plus
-description: Full backup, update, and restore for OpenClaw/Moltbot/Clawdbot - config, workspace, and skills with auto-rollback
-version: 3.1.0
-metadata: {"clawdbot":{"emoji":"🔄","requires":{"bins":["git","jq","rsync"]}}}
+description: Full backup, update, and restore for OpenClaw - config, workspace, and skills with auto-rollback
+version: 4.0.0
+metadata: {"openclaw":{"emoji":"🔄","requires":{"bins":["git","jq","rsync"]}}}
 ---
 
 # 🔄 Update Plus
 
-A comprehensive backup, update, and restore tool for your entire OpenClaw/Moltbot/Clawdbot environment. Protect your config, workspace, and skills with automatic rollback, encrypted backups, and cloud sync.
-
-**Auto-detect**: Works with `openclaw`, `moltbot`, and `clawdbot` (auto-detected).
+A comprehensive backup, update, and restore tool for your OpenClaw environment. Protect your config, workspace, and skills with automatic rollback, encrypted backups, and cloud sync.
 
 ## Quick Start
 
@@ -27,7 +25,7 @@ update-plus update
 update-plus update --dry-run
 
 # Restore from backup
-update-plus restore update-plus-2026-01-25-12:00:00.tar.gz
+update-plus restore openclaw-backup-2026-01-25-12:00:00.tar.gz
 ```
 
 ## Features
@@ -43,12 +41,10 @@ update-plus restore update-plus-2026-01-25-12:00:00.tar.gz
 | **Cloud Sync** | Upload backups to Google Drive, S3, Dropbox via rclone |
 | **Notifications** | Get notified via WhatsApp, Telegram, or Discord |
 | **Connection Retry** | Auto-retry on network failure (configurable) |
-| **Bot Auto-detect** | Works with openclaw, moltbot, and clawdbot |
 
 ## Installation
 
 ```bash
-# Clone manually
 git clone https://github.com/hopyky/update-plus.git ~/.openclaw/skills/update-plus
 ```
 
@@ -72,7 +68,7 @@ Create `~/.openclaw/update-plus.json`:
   "backup_count": 5,
   "backup_paths": [
     {"path": "~/.openclaw", "label": "config", "exclude": ["backups", "logs"]},
-    {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules", ".venv"]}
+    {"path": "~/.openclaw/workspace", "label": "workspace", "exclude": ["node_modules"]}
   ],
   "skills_dirs": [
     {"path": "~/.openclaw/skills", "label": "prod", "update": true}
@@ -86,20 +82,13 @@ Create `~/.openclaw/update-plus.json`:
 }
 ```
 
-### Config file locations (searched in order)
-
-1. `~/.openclaw/update-plus.json`
-2. `~/.moltbot/update-plus.json`
-3. `~/.clawdbot/update-plus.json`
-4. Legacy names (openclaw-update.json, moltbot-update.json, clawdbot-update.json)
-
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `update-plus check` | Check for available updates |
 | `update-plus backup` | Create a full backup |
-| `update-plus update` | Update bot and all skills |
+| `update-plus update` | Update OpenClaw and all skills |
 | `update-plus update --dry-run` | Preview changes |
 | `update-plus restore <file>` | Restore from backup |
 | `update-plus install-cron` | Install automatic updates (daily 2 AM) |
@@ -107,14 +96,13 @@ Create `~/.openclaw/update-plus.json`:
 
 ## Changelog
 
-### v3.1.0
-- Added OpenClaw support (openclaw preferred, moltbot/clawdbot fallback)
+### v4.0.0
+- OpenClaw only (removed moltbot/clawdbot legacy support)
+- Simplified configuration and paths
 - Config: ~/.openclaw/update-plus.json
-- Auto-detect bot command and npm package
 
-### v3.0.0
-- Renamed to update-plus
-- Added moltbot support
+### v3.x
+- Multi-bot support (openclaw, moltbot, clawdbot)
 - Connection retry for cron jobs
 
 ## Author

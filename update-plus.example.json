@@ -5,11 +5,10 @@
   "excluded_skills": [],
   "backup_paths": [
     {"path": "~/.openclaw", "label": "config", "exclude": ["backups", "logs", "media", "*.lock"]},
-    {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules", ".venv", "__pycache__"]}
+    {"path": "~/.openclaw/workspace", "label": "workspace", "exclude": ["node_modules", ".venv", "__pycache__"]}
   ],
   "skills_dirs": [
-    {"path": "~/.openclaw/skills", "label": "prod", "update": true},
-    {"path": "~/clawd/skills", "label": "dev", "update": false}
+    {"path": "~/.openclaw/skills", "label": "prod", "update": true}
   ],
   "remote_storage": {
     "enabled": false,
