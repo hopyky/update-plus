@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Update Plus - Update functions
-# Version: 3.0.0
-# Supports both moltbot and clawdbot
+# Version: 3.1.0
+# Supports openclaw, moltbot, and clawdbot
 
 # Global tracking
 BOT_UPDATED=false
@@ -10,7 +10,7 @@ SKILLS_UPDATED=0
 
 # Fix pnpm launcher script bug (pnpm doesn't update the launcher after upgrade)
 fix_pnpm_launcher() {
-  local bot_bin=$(which "$BOT_NAME" 2>/dev/null || which moltbot 2>/dev/null || which clawdbot 2>/dev/null)
+  local bot_bin=$(which "$BOT_NAME" 2>/dev/null || which openclaw 2>/dev/null || which moltbot 2>/dev/null || which clawdbot 2>/dev/null)
 
   if [[ -z "$bot_bin" ]]; then
     return 0
@@ -31,9 +31,14 @@ fix_pnpm_launcher() {
     return 1
   fi
 
-  # Find the latest bot version directory (try moltbot first, then clawdbot)
-  local latest_bot_dir=$(ls -d "$pnpm_global_dir"/moltbot@* 2>/dev/null | sort -V | tail -1)
-  local pkg_pattern="moltbot"
+  # Find the latest bot version directory (try openclaw first, then moltbot, then clawdbot)
+  local latest_bot_dir=$(ls -d "$pnpm_global_dir"/openclaw@* 2>/dev/null | sort -V | tail -1)
+  local pkg_pattern="openclaw"
+
+  if [[ -z "$latest_bot_dir" ]]; then
+    latest_bot_dir=$(ls -d "$pnpm_global_dir"/moltbot@* 2>/dev/null | sort -V | tail -1)
+    pkg_pattern="moltbot"
+  fi
 
   if [[ -z "$latest_bot_dir" ]]; then
     latest_bot_dir=$(ls -d "$pnpm_global_dir"/clawdbot@* 2>/dev/null | sort -V | tail -1)
@@ -41,7 +46,7 @@ fix_pnpm_launcher() {
   fi
 
   if [[ -z "$latest_bot_dir" ]]; then
-    log_warning "Could not find moltbot/clawdbot installation"
+    log_warning "Could not find openclaw/moltbot/clawdbot installation"
     return 1
   fi
 
@@ -72,7 +77,7 @@ fix_pnpm_launcher() {
 # Detect package manager used to install bot
 detect_package_manager() {
   # Check if bot is in a pnpm/yarn/bun global path
-  local bot_path=$(which "$BOT_NAME" 2>/dev/null || which moltbot 2>/dev/null || which clawdbot 2>/dev/null)
+  local bot_path=$(which "$BOT_NAME" 2>/dev/null || which openclaw 2>/dev/null || which moltbot 2>/dev/null || which clawdbot 2>/dev/null)
 
   if [[ "$bot_path" == *"pnpm"* ]]; then
     echo "pnpm"
@@ -80,11 +85,11 @@ detect_package_manager() {
     echo "yarn"
   elif [[ "$bot_path" == *"bun"* ]]; then
     echo "bun"
-  elif command_exists pnpm && (pnpm list -g moltbot 2>/dev/null | grep -qE 'moltbot|clawdbot' || pnpm list -g clawdbot 2>/dev/null | grep -q clawdbot); then
+  elif command_exists pnpm && (pnpm list -g openclaw 2>/dev/null | grep -qE 'openclaw|moltbot|clawdbot' || pnpm list -g moltbot 2>/dev/null | grep -qE 'moltbot|clawdbot'); then
     echo "pnpm"
-  elif command_exists yarn && (yarn global list 2>/dev/null | grep -qE 'moltbot|clawdbot'); then
+  elif command_exists yarn && (yarn global list 2>/dev/null | grep -qE 'openclaw|moltbot|clawdbot'); then
     echo "yarn"
-  elif command_exists bun && (bun pm ls -g 2>/dev/null | grep -qE 'moltbot|clawdbot'); then
+  elif command_exists bun && (bun pm ls -g 2>/dev/null | grep -qE 'openclaw|moltbot|clawdbot'); then
     echo "bun"
   elif command_exists npm; then
     echo "npm"
@@ -104,13 +109,18 @@ update_bot() {
 
   # Check if bot command exists
   if ! command_exists "$BOT_NAME"; then
-    # Try the other name as fallback
-    local alt_name=$([[ "$BOT_NAME" == "moltbot" ]] && echo "clawdbot" || echo "moltbot")
-    if command_exists "$alt_name"; then
-      BOT_NAME="$alt_name"
+    # Try fallback names in order
+    if command_exists openclaw; then
+      BOT_NAME="openclaw"
+      log_info "Using $BOT_NAME (fallback)"
+    elif command_exists moltbot; then
+      BOT_NAME="moltbot"
+      log_info "Using $BOT_NAME (fallback)"
+    elif command_exists clawdbot; then
+      BOT_NAME="clawdbot"
       log_info "Using $BOT_NAME (fallback)"
     else
-      log_error "Neither moltbot nor clawdbot command found"
+      log_error "No bot command found (openclaw, moltbot, or clawdbot)"
       return 1
     fi
   fi
@@ -124,11 +134,15 @@ update_bot() {
   local pkg_manager=$(detect_package_manager)
   log_info "Package manager: $pkg_manager"
 
-  # Determine package name (moltbot preferred, clawdbot as fallback)
-  local pkg_name="moltbot"
-  # Check if moltbot package exists on npm
-  if ! npm view moltbot version &>/dev/null 2>&1; then
-    pkg_name="clawdbot"
+  # Determine package name (openclaw preferred, then moltbot, then clawdbot)
+  local pkg_name="openclaw"
+  # Check which package exists on npm
+  if ! npm view openclaw version &>/dev/null 2>&1; then
+    if npm view moltbot version &>/dev/null 2>&1; then
+      pkg_name="moltbot"
+    else
+      pkg_name="clawdbot"
+    fi
   fi
 
   # Run appropriate update command
@@ -177,8 +191,10 @@ update_bot() {
     fix_pnpm_launcher
   fi
 
-  # Re-detect bot name after update (might have changed from clawdbot to moltbot)
-  if command_exists moltbot; then
+  # Re-detect bot name after update (might have changed to openclaw)
+  if command_exists openclaw; then
+    BOT_NAME="openclaw"
+  elif command_exists moltbot; then
     BOT_NAME="moltbot"
   fi
 
@@ -313,22 +329,41 @@ check_updates() {
   log_info "Checking for updates..."
   echo ""
 
-  # Check bot version (moltbot or clawdbot)
-  if command_exists "$BOT_NAME" || command_exists moltbot || command_exists clawdbot; then
+  # Check bot version (openclaw, moltbot, or clawdbot)
+  if command_exists "$BOT_NAME" || command_exists openclaw || command_exists moltbot || command_exists clawdbot; then
     local bot_cmd="$BOT_NAME"
-    command_exists "$bot_cmd" || bot_cmd=$(command_exists moltbot && echo "moltbot" || echo "clawdbot")
+    if ! command_exists "$bot_cmd"; then
+      if command_exists openclaw; then bot_cmd="openclaw"
+      elif command_exists moltbot; then bot_cmd="moltbot"
+      else bot_cmd="clawdbot"
+      fi
+    fi
 
     local current_version=$($bot_cmd --version 2>/dev/null | head -1 || echo "unknown")
     local latest_version="unknown"
 
-    # Try to get latest version (try moltbot first, then clawdbot)
-    local pkg_name="moltbot"
+    # Try to get latest version (try openclaw first, then moltbot, then clawdbot)
+    local pkg_name="openclaw"
     if command_exists npm; then
-      latest_version=$(npm view moltbot version 2>/dev/null || echo "")
-      [[ -z "$latest_version" ]] && latest_version=$(npm view clawdbot version 2>/dev/null || echo "unknown") && pkg_name="clawdbot"
+      latest_version=$(npm view openclaw version 2>/dev/null || echo "")
+      if [[ -z "$latest_version" ]]; then
+        latest_version=$(npm view moltbot version 2>/dev/null || echo "")
+        pkg_name="moltbot"
+      fi
+      if [[ -z "$latest_version" ]]; then
+        latest_version=$(npm view clawdbot version 2>/dev/null || echo "unknown")
+        pkg_name="clawdbot"
+      fi
     elif command_exists pnpm; then
-      latest_version=$(pnpm view moltbot version 2>/dev/null || echo "")
-      [[ -z "$latest_version" ]] && latest_version=$(pnpm view clawdbot version 2>/dev/null || echo "unknown") && pkg_name="clawdbot"
+      latest_version=$(pnpm view openclaw version 2>/dev/null || echo "")
+      if [[ -z "$latest_version" ]]; then
+        latest_version=$(pnpm view moltbot version 2>/dev/null || echo "")
+        pkg_name="moltbot"
+      fi
+      if [[ -z "$latest_version" ]]; then
+        latest_version=$(pnpm view clawdbot version 2>/dev/null || echo "unknown")
+        pkg_name="clawdbot"
+      fi
     fi
 
     echo -e "  ${BLUE}${BOT_NAME_UPPER}${NC}"

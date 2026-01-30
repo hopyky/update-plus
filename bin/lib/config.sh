@@ -1,35 +1,43 @@
 #!/usr/bin/env bash
 # Update Plus - Configuration management
-# Version: 3.0.0
-# Supports both moltbot and clawdbot
+# Version: 3.1.0
+# Supports openclaw, moltbot, and clawdbot
 
-# Detect which bot is installed (moltbot preferred, clawdbot as fallback)
+# Detect which bot is installed (openclaw preferred, then moltbot, then clawdbot)
 detect_bot_name() {
-  if command -v moltbot &>/dev/null; then
+  if command -v openclaw &>/dev/null; then
+    echo "openclaw"
+  elif command -v moltbot &>/dev/null; then
     echo "moltbot"
   elif command -v clawdbot &>/dev/null; then
     echo "clawdbot"
   else
     # Check common paths
-    if [[ -d "${HOME}/.moltbot" ]]; then
+    if [[ -d "${HOME}/.openclaw" ]]; then
+      echo "openclaw"
+    elif [[ -d "${HOME}/.moltbot" ]]; then
       echo "moltbot"
     elif [[ -d "${HOME}/.clawdbot" ]]; then
       echo "clawdbot"
     else
-      echo "moltbot"  # Default to new name
+      echo "openclaw"  # Default to new name
     fi
   fi
 }
 
-# Bot name (moltbot or clawdbot)
+# Bot name (openclaw, moltbot, or clawdbot)
 BOT_NAME=$(detect_bot_name)
 BOT_NAME_UPPER=$(echo "$BOT_NAME" | tr '[:lower:]' '[:upper:]')
 
 # Default paths (adapt based on detected bot)
 WORKSPACE_DEFAULT="${HOME}/clawd"
-if [[ "$BOT_NAME" == "moltbot" ]]; then
+if [[ "$BOT_NAME" == "openclaw" ]]; then
+  BOT_DIR="${HOME}/.openclaw"
+  # Fallback to legacy dirs if .openclaw doesn't exist
+  [[ ! -d "$BOT_DIR" ]] && [[ -d "${HOME}/.moltbot" ]] && BOT_DIR="${HOME}/.moltbot"
+  [[ ! -d "$BOT_DIR" ]] && [[ -d "${HOME}/.clawdbot" ]] && BOT_DIR="${HOME}/.clawdbot"
+elif [[ "$BOT_NAME" == "moltbot" ]]; then
   BOT_DIR="${HOME}/.moltbot"
-  # Also check legacy .clawdbot if .moltbot doesn't exist
   [[ ! -d "$BOT_DIR" ]] && [[ -d "${HOME}/.clawdbot" ]] && BOT_DIR="${HOME}/.clawdbot"
 else
   BOT_DIR="${HOME}/.clawdbot"
@@ -38,10 +46,14 @@ fi
 BACKUP_DIR_DEFAULT="${BOT_DIR}/backups"
 
 # Config file (searched in order: update-plus.json first, then legacy names)
-if [[ -f "${HOME}/.moltbot/update-plus.json" ]]; then
+if [[ -f "${HOME}/.openclaw/update-plus.json" ]]; then
+  CONFIG_FILE="${HOME}/.openclaw/update-plus.json"
+elif [[ -f "${HOME}/.moltbot/update-plus.json" ]]; then
   CONFIG_FILE="${HOME}/.moltbot/update-plus.json"
 elif [[ -f "${HOME}/.clawdbot/update-plus.json" ]]; then
   CONFIG_FILE="${HOME}/.clawdbot/update-plus.json"
+elif [[ -f "${HOME}/.openclaw/openclaw-update.json" ]]; then
+  CONFIG_FILE="${HOME}/.openclaw/openclaw-update.json"
 elif [[ -f "${HOME}/.moltbot/moltbot-update.json" ]]; then
   CONFIG_FILE="${HOME}/.moltbot/moltbot-update.json"
 elif [[ -f "${HOME}/.clawdbot/clawdbot-update.json" ]]; then
@@ -129,8 +141,11 @@ load_config() {
       SKILLS_DIRS_JSON=$(jq -n --arg path "$skills_dir" '[{path: $path, label: "default", update: true}]')
     fi
   else
-    # No config file, use defaults (try moltbot path first, then clawdbot)
-    if [[ -d "${HOME}/.moltbot/skills" ]]; then
+    # No config file, use defaults (try openclaw first, then moltbot, then clawdbot)
+    if [[ -d "${HOME}/.openclaw/skills" ]] || [[ -d "${HOME}/.openclaw/workspace/skills" ]]; then
+      local skills_path=$([[ -d "${HOME}/.openclaw/workspace/skills" ]] && echo "~/.openclaw/workspace/skills" || echo "~/.openclaw/skills")
+      SKILLS_DIRS_JSON=$(jq -n --arg path "$skills_path" '[{path: $path, label: "default", update: true}]')
+    elif [[ -d "${HOME}/.moltbot/skills" ]]; then
       SKILLS_DIRS_JSON=$(jq -n '[{path: "~/.moltbot/skills", label: "default", update: true}]')
     else
       SKILLS_DIRS_JSON=$(jq -n '[{path: "~/.clawdbot/skills", label: "default", update: true}]')

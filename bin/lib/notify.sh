@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Update Plus - Notification functions
-# Version: 3.0.0
-# Supports both moltbot and clawdbot
+# Version: 3.1.0
+# Supports openclaw, moltbot, and clawdbot
 
 # Detect channel from target format
 detect_channel() {
@@ -49,14 +49,16 @@ send_notification() {
 
   log_info "Sending notification..."
 
-  # Check if bot command is available (moltbot or clawdbot)
+  # Check if bot command is available (openclaw, moltbot, or clawdbot)
   local notify_cmd=""
-  if command_exists moltbot; then
+  if command_exists openclaw; then
+    notify_cmd="openclaw"
+  elif command_exists moltbot; then
     notify_cmd="moltbot"
   elif command_exists clawdbot; then
     notify_cmd="clawdbot"
   else
-    log_warning "Neither moltbot nor clawdbot command found, skipping notification"
+    log_warning "No bot command found (openclaw, moltbot, or clawdbot), skipping notification"
     return 0
   fi
 

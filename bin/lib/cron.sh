@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Update Plus - Cron management functions
-# Version: 3.0.0
-# Supports both moltbot and clawdbot
+# Version: 3.1.0
+# Supports openclaw, moltbot, and clawdbot
 
 # Install cron job for automatic updates
 install_cron() {
@@ -15,6 +15,7 @@ install_cron() {
 
   # Build PATH for cron environment (cron has minimal PATH by default)
   local cron_path="/usr/local/bin:/usr/bin:/bin"
+  [[ -d "${HOME}/.openclaw/bin" ]] && cron_path="${HOME}/.openclaw/bin:${cron_path}"
   [[ -d "${HOME}/.moltbot/bin" ]] && cron_path="${HOME}/.moltbot/bin:${cron_path}"
   [[ -d "${HOME}/.clawdbot/bin" ]] && cron_path="${HOME}/.clawdbot/bin:${cron_path}"
   [[ -d "${HOME}/Library/pnpm" ]] && cron_path="${HOME}/Library/pnpm:${cron_path}"

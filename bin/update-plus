@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Update Plus v3.0.0
-# Full backup, update, and restore for Moltbot/Clawdbot
+# Update Plus v3.1.0
+# Full backup, update, and restore for OpenClaw/Moltbot/Clawdbot
 # Author: hopyky
 # License: MIT
 
@@ -33,14 +33,14 @@ NO_BACKUP_CLI=false
 
 # Show version
 show_version() {
-  echo "Update Plus v3.0.0"
+  echo "Update Plus v3.1.0"
 }
 
 # Show help
 show_help() {
   cat <<'EOF'
-Update Plus v3.0.0
-Full backup, update, and restore for Moltbot/Clawdbot.
+Update Plus v3.1.0
+Full backup, update, and restore for OpenClaw/Moltbot/Clawdbot.
 
 USAGE
   update-plus <command> [options]
@@ -66,22 +66,24 @@ OPTIONS
 
 CONFIGURATION
   Config file location (searched in order):
-    1. ~/.moltbot/update-plus.json
-    2. ~/.clawdbot/update-plus.json
-    3. ~/.moltbot/moltbot-update.json  (legacy)
-    4. ~/.clawdbot/clawdbot-update.json (legacy)
+    1. ~/.openclaw/update-plus.json
+    2. ~/.moltbot/update-plus.json
+    3. ~/.clawdbot/update-plus.json
+    4. ~/.openclaw/openclaw-update.json (legacy)
+    5. ~/.moltbot/moltbot-update.json   (legacy)
+    6. ~/.clawdbot/clawdbot-update.json (legacy)
 
   Example config:
     {
-      "backup_dir": "~/.moltbot/backups",
+      "backup_dir": "~/.openclaw/backups",
       "backup_before_update": true,
       "backup_count": 5,
       "backup_paths": [
-        {"path": "~/.moltbot", "label": "config", "exclude": ["backups", "logs"]},
+        {"path": "~/.openclaw", "label": "config", "exclude": ["backups", "logs"]},
         {"path": "~/clawd", "label": "workspace", "exclude": ["node_modules"]}
       ],
       "skills_dirs": [
-        {"path": "~/.moltbot/skills", "label": "prod", "update": true}
+        {"path": "~/.openclaw/skills", "label": "prod", "update": true}
       ],
       "notifications": {
         "enabled": true,
