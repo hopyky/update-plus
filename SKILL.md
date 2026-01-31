@@ -1,7 +1,7 @@
 ---
 name: update-plus
 description: Full backup, update, and restore for OpenClaw - config, workspace, and skills with auto-rollback
-version: 4.0.1
+version: 4.0.3
 metadata: {"openclaw":{"emoji":"🔄","requires":{"bins":["git","jq","rsync"]}}}
 ---
 
@@ -95,6 +95,14 @@ Create `~/.openclaw/update-plus.json`:
 | `update-plus uninstall-cron` | Remove cron job |
 
 ## Changelog
+
+### v4.0.3
+- Check for updates BEFORE backup (skip backup if already up to date)
+- No more wasted bandwidth/storage when nothing to update
+
+### v4.0.2
+- Use curl instead of ping for connection check (more reliable)
+- Works through firewalls and when Mac wakes from sleep
 
 ### v4.0.1
 - Added Homebrew path detection (`/opt/homebrew/bin`) for cron jobs

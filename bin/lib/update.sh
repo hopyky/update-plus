@@ -1,11 +1,75 @@
 #!/usr/bin/env bash
 # Update Plus - Update functions
-# Version: 4.0.1
+# Version: 4.0.3
 # For OpenClaw
 
 # Global tracking
 BOT_UPDATED=false
 SKILLS_UPDATED=0
+OPENCLAW_UPDATE_AVAILABLE=false
+SKILLS_UPDATE_AVAILABLE=false
+
+# Quick check if any updates are available (before backup)
+has_updates_available() {
+  log_info "Checking for available updates..."
+
+  OPENCLAW_UPDATE_AVAILABLE=false
+  SKILLS_UPDATE_AVAILABLE=false
+
+  # Check OpenClaw version
+  if command_exists openclaw; then
+    local current_version=$(openclaw --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?' | head -1 || echo "unknown")
+    local latest_version="unknown"
+
+    if command_exists npm; then
+      latest_version=$(npm view openclaw version 2>/dev/null || echo "unknown")
+    elif command_exists pnpm; then
+      latest_version=$(pnpm view openclaw version 2>/dev/null || echo "unknown")
+    fi
+
+    if [[ "$latest_version" != "unknown" ]] && [[ "$current_version" != "$latest_version" ]]; then
+      log_info "OpenClaw update available: $current_version → $latest_version"
+      OPENCLAW_UPDATE_AVAILABLE=true
+    else
+      log_info "OpenClaw is up to date ($current_version)"
+    fi
+  fi
+
+  # Check skills for updates
+  local skills_dirs_json=$(get_skills_dirs)
+
+  while IFS= read -r dir_config; do
+    local dir_path=$(echo "$dir_config" | jq -r '.path')
+    dir_path=$(expand_path "$dir_path")
+    local dir_update=$(echo "$dir_config" | jq -r '.update')
+
+    [[ "$dir_update" != "true" ]] && continue
+    [[ ! -d "$dir_path" ]] && continue
+
+    for skill_dir in "$dir_path"/*/; do
+      [[ -d "$skill_dir/.git" ]] || continue
+
+      local skill_name=$(basename "$skill_dir")
+      is_excluded "$skill_name" && continue
+
+      cd "$skill_dir"
+      git fetch --quiet 2>/dev/null || continue
+
+      local behind=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo "0")
+      if [[ "$behind" -gt 0 ]]; then
+        log_info "Skill update available: $skill_name ($behind commits behind)"
+        SKILLS_UPDATE_AVAILABLE=true
+      fi
+    done
+  done < <(echo "$skills_dirs_json" | jq -c '.[]')
+
+  # Return true if any updates available
+  if [[ "$OPENCLAW_UPDATE_AVAILABLE" == true ]] || [[ "$SKILLS_UPDATE_AVAILABLE" == true ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
 
 # Fix pnpm launcher script bug (pnpm doesn't update the launcher after upgrade)
 fix_pnpm_launcher() {

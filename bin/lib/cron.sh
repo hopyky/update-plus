@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update Plus - Cron management functions
-# Version: 4.0.1
+# Version: 4.0.3
 # For OpenClaw
 
 # Install cron job for automatic updates

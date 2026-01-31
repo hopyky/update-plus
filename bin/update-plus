@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update Plus v4.0.1
+# Update Plus v4.0.3
 # Full backup, update, and restore for OpenClaw
 # Author: hopyky
 # License: MIT
@@ -33,13 +33,13 @@ NO_BACKUP_CLI=false
 
 # Show version
 show_version() {
-  echo "Update Plus v4.0.1"
+  echo "Update Plus v4.0.3"
 }
 
 # Show help
 show_help() {
   cat <<'EOF'
-Update Plus v4.0.1
+Update Plus v4.0.3
 Full backup, update, and restore for OpenClaw.
 
 USAGE
@@ -226,7 +226,20 @@ cmd_update() {
     exit 1
   fi
 
-  # Create backup if enabled
+  # Check if updates are available BEFORE backup
+  if ! has_updates_available; then
+    if [[ "$FORCE_UPDATE" != true ]]; then
+      echo ""
+      log_success "Already up to date! No backup needed."
+      log_to_file "=== No updates available, skipping $(date '+%Y-%m-%d %H:%M:%S') ==="
+      # Silent exit - no notification for "nothing to do"
+      exit 0
+    else
+      log_warning "No updates available, but --force is enabled. Continuing..."
+    fi
+  fi
+
+  # Create backup if enabled (only if updates are available)
   local backup_name=""
   if [[ "$BACKUP_BEFORE_UPDATE" == "true" ]]; then
     if ! backup_name=$(create_backup); then
@@ -240,15 +253,23 @@ cmd_update() {
     fi
   fi
 
-  # Update OpenClaw
-  if ! update_bot; then
-    log_error "OpenClaw update failed"
-    send_notification "error" "OpenClaw update failed"
-    exit 1
+  # Update OpenClaw (only if update available)
+  if [[ "$OPENCLAW_UPDATE_AVAILABLE" == true ]]; then
+    if ! update_bot; then
+      log_error "OpenClaw update failed"
+      send_notification "error" "OpenClaw update failed"
+      exit 1
+    fi
+  else
+    log_info "OpenClaw already up to date, skipping..."
   fi
 
-  # Update skills
-  update_skills
+  # Update skills (only if updates available)
+  if [[ "$SKILLS_UPDATE_AVAILABLE" == true ]]; then
+    update_skills
+  else
+    log_info "All skills already up to date, skipping..."
+  fi
 
   # Build summary
   local summary=""

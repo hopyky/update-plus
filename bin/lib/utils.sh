@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update Plus - Utility functions
-# Version: 4.0.1
+# Version: 4.0.3
 # For OpenClaw
 
 # Colors for output
@@ -88,6 +88,7 @@ check_disk_space() {
 }
 
 # Check internet connection with retry
+# Uses curl instead of ping (more reliable, works through firewalls)
 check_connection() {
   local max_retries="${CONNECTION_RETRIES:-3}"
   local retry_delay="${CONNECTION_RETRY_DELAY:-60}"  # seconds
@@ -96,7 +97,9 @@ check_connection() {
   log_info "Checking internet connection..."
 
   while [[ $attempt -le $max_retries ]]; do
-    if ping -c 1 -W 5 github.com &> /dev/null || ping -c 1 -W 5 8.8.8.8 &> /dev/null; then
+    # Try curl first (more reliable), fallback to ping
+    if curl -s --connect-timeout 5 --max-time 10 https://github.com -o /dev/null 2>/dev/null || \
+       curl -s --connect-timeout 5 --max-time 10 https://google.com -o /dev/null 2>/dev/null; then
       log_success "Internet connection is available."
       return 0
     fi
